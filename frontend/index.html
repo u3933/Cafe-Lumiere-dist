@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="screen-orientation" content="landscape">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.json">
+  <title>Cafe Lumiere</title>
+  <style>
+    @font-face { font-family: 'PixelMplus'; src: url('./assets/PixelMplus12-Bold.ttf') format('truetype'); font-weight: bold; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #1a0f0a; overflow: hidden; font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; }
+    @media (orientation: portrait) {
+      body::before { content: "横画面でご利用ください"; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #1a0f0a; color: #d4a87a; font-size: 1.2rem; z-index: 9999; }
+      #app { display: none; }
+    }
+    #app { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    #scene-canvas { display: block; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(100vw, calc(100vh * 16 / 9)); height: min(100vh, calc(100vw * 9 / 16)); }
+
+    /* 吹き出し共通 */
+    .bubble { position: absolute; max-width: 192px; padding: 10px 14px; border-radius: 16px; font-family: 'PixelMplus', 'Hiragino Kaku Gothic ProN', sans-serif; font-size: 0.72rem; line-height: 1.5; pointer-events: none; opacity: 0; transition: opacity 0.3s ease; word-break: break-all; z-index: 10; }
+    .bubble.visible { opacity: 1; }
+    #bubble-chara1 { top: 16%; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.95); color: #1a1008; border: 2px solid #c8903a; border-radius: 16px 16px 16px 4px; }
+    #bubble-chara2 { top: 16%; left: 3%; background: rgba(255,255,255,0.95); color: #1a1008; border: 2px solid #4a7ac0; border-radius: 16px 16px 4px 16px; }
+
+    /* マイクボタン */
+    #mic-btn { position: absolute; bottom: 3%; left: 50%; transform: translateX(-50%); width: 64px; height: 64px; border-radius: 50%; border: 3px solid #c8903a; background: #4a2c10; color: #d4a87a; font-size: 1.6rem; cursor: pointer; z-index: 20; display: flex; align-items: center; justify-content: center; transition: background 0.2s, border-color 0.2s, box-shadow 0.2s; -webkit-tap-highlight-color: transparent; user-select: none; }
+    #mic-btn:hover { background: #6a3c18; }
+    #mic-btn.recording { background: #8b1a1a; border-color: #ff4444; box-shadow: 0 0 0 8px rgba(255,68,68,0.3); animation: pulse 0.8s infinite; }
+    #mic-btn.processing { background: #333; border-color: #666; cursor: not-allowed; color: #888; animation: spin 1s linear infinite; }
+    #mic-btn.speaking { background: #1a4a1a; border-color: #44cc44; box-shadow: 0 0 12px rgba(68,204,68,0.5); }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 8px rgba(255,68,68,0.3); } 50% { box-shadow: 0 0 0 16px rgba(255,68,68,0.1); } }
+    @keyframes spin { from { transform: translateX(-50%) rotate(0deg); } to { transform: translateX(-50%) rotate(360deg); } }
+
+    /* ステータスラベル — 黒太字で視認性を確保 */
+    #status-label { position: absolute; bottom: 1%; left: 50%; transform: translateX(-50%); color: rgba(0,0,0,0.75); font-size: 0.65rem; font-weight: bold; pointer-events: none; z-index: 20; }
+
+    #theme-label { display: none; }
+
+    /* チャットパネル */
+    #chat-toggle { position: absolute; bottom: 3%; right: 2%; width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(212,168,122,0.6); background: rgba(30,15,5,0.85); color: #d4a87a; font-size: 1.1rem; cursor: pointer; z-index: 30; display: flex; align-items: center; justify-content: center; transition: border-color 0.2s, background 0.2s; -webkit-tap-highlight-color: transparent; user-select: none; }
+    #chat-toggle:hover { background: rgba(60,30,10,0.9); border-color: #d4a87a; }
+    #chat-toggle.active { border-color: #c8903a; background: rgba(74,44,16,0.9); }
+    #chat-panel { position: absolute; bottom: calc(3% + 52px); right: calc(2% + 52px); width: 300px; max-height: 280px; background: rgba(255,255,255,0.97); border: 1px solid rgba(200,144,58,0.5); border-radius: 12px; display: flex; flex-direction: column; z-index: 29; overflow: hidden; transform-origin: bottom right; transform: scaleY(0); opacity: 0; pointer-events: none; transition: transform 0.22s ease, opacity 0.22s ease; }
+    #chat-panel.open { transform: scaleY(1); opacity: 1; pointer-events: auto; }
+    #chat-history { flex: 1; overflow-y: auto; padding: 10px 10px 6px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; scrollbar-color: rgba(200,144,58,0.3) transparent; }
+    #chat-history::-webkit-scrollbar { width: 4px; }
+    #chat-history::-webkit-scrollbar-thumb { background: rgba(180,130,60,0.4); border-radius: 2px; }
+    .chat-msg { max-width: 85%; padding: 6px 10px; border-radius: 10px; font-size: 0.78rem; line-height: 1.45; word-break: break-all; animation: msgIn 0.15s ease; }
+    @keyframes msgIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .chat-msg.user { align-self: flex-end; background: rgba(200,144,58,0.18); color: #3a1f00; border: 1px solid rgba(200,144,58,0.5); border-radius: 10px 10px 3px 10px; }
+    .chat-msg.chara1, .chat-msg.mia { align-self: flex-start; background: rgba(200,144,58,0.12); color: #3a1f00; border: 1px solid rgba(200,144,58,0.35); border-radius: 10px 10px 10px 3px; }
+    .chat-msg.chara1::before, .chat-msg.mia::before { content: 'Chara1  '; font-size: 0.65rem; color: #c8903a; display: block; margin-bottom: 2px; }
+    .chat-msg.chara2, .chat-msg.master { align-self: flex-start; background: rgba(74,122,192,0.12); color: #0a1a33; border: 1px solid rgba(74,122,192,0.35); border-radius: 10px 10px 10px 3px; }
+    .chat-msg.chara2::before, .chat-msg.master::before { content: 'Chara2  '; font-size: 0.65rem; color: #4a7ac0; display: block; margin-bottom: 2px; }
+    #chat-input-area { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-top: 1px solid rgba(200,144,58,0.25); background: rgba(245,238,228,0.95); }
+    #chat-input { flex: 1; background: #fff; border: 1px solid rgba(200,144,58,0.5); border-radius: 8px; color: #1a1008; font-size: 0.78rem; padding: 6px 10px; outline: none; font-family: inherit; }
+    #chat-input::placeholder { color: rgba(100,70,30,0.4); }
+    #chat-input:focus { border-color: #c8903a; }
+    #chat-send { width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(200,144,58,0.6); background: rgba(200,144,58,0.85); color: #fff; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+    #chat-send:hover { background: rgba(180,120,40,0.95); }
+
+    /* ゲームボタン */
+    #game-buttons { position: absolute; bottom: calc(3% + 52px); right: 2%; display: flex; flex-direction: column; gap: 8px; z-index: 30; }
+    .game-btn { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(212,168,122,0.5); background: rgba(30,15,5,0.85); font-size: 1.3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s, border-color 0.2s; -webkit-tap-highlight-color: transparent; user-select: none; }
+    .game-btn:hover { background: rgba(60,30,10,0.9); border-color: #d4a87a; }
+
+    /* リマインダーパネル */
+    #rm-overlay { display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: center; justify-content: center; }
+    #rm-panel { background: rgba(255,255,255,0.97); border: 1px solid rgba(200,144,58,0.5); border-radius: 12px; padding: 18px 20px; width: min(340px, 90%); color: #3a2010; font-size: 0.88rem; }
+    #rm-panel h3 { margin: 0 0 12px; font-size: 1rem; color: #3a2010; display: flex; align-items: center; justify-content: space-between; }
+    #rm-panel h3 button { background: none; border: none; color: #9a7850; font-size: 1.1rem; cursor: pointer; }
+    .rm-empty { color: #8a7060; text-align: center; margin: 10px 0; }
+    .rm-item { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid rgba(200,144,58,0.2); }
+    .rm-disabled { opacity: 0.4; }
+    .rm-time  { font-weight: bold; min-width: 42px; color: #3a2010; }
+    .rm-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3a2010; }
+    .rm-repeat { font-size: 0.75rem; color: #9a7850; min-width: 44px; text-align: right; }
+    .rm-del { background: none; border: none; color: #b07050; cursor: pointer; font-size: 0.9rem; padding: 2px 4px; }
+    .rm-del:hover { color: #c04020; }
+    #rm-add-form { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    #rm-add-form input, #rm-add-form select { background: #fff; border: 1px solid rgba(200,144,58,0.4); border-radius: 6px; color: #3a2010; padding: 6px 8px; font-size: 0.85rem; width: 100%; box-sizing: border-box; }
+    #rm-add-form input[type="time"] { color-scheme: light; }
+    #rm-add-btn { background: rgba(180,120,40,0.85); border: none; border-radius: 6px; color: #fff; font-weight: bold; padding: 7px; cursor: pointer; font-size: 0.88rem; }
+    #rm-add-btn:hover:not(:disabled) { background: rgba(200,140,60,0.95); }
+    #rm-add-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* リマインダー通知 */
+    #rm-notify { display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.55); z-index: 60; align-items: center; justify-content: center; }
+    #rm-notify-box { background: rgba(255,255,255,0.97); border: 2px solid rgba(200,144,58,0.7); border-radius: 14px; padding: 28px 32px; text-align: center; color: #3a2010; }
+    #rm-notify-icon { font-size: 2.2rem; margin-bottom: 10px; }
+    #rm-notify-name { font-size: 1.25rem; font-weight: bold; color: #3a2010; margin-bottom: 18px; max-width: 260px; word-break: break-all; }
+    #rm-notify-ok { background: rgba(180,120,40,0.85); border: none; border-radius: 8px; color: #1a0f05; font-weight: bold; padding: 8px 28px; cursor: pointer; font-size: 0.95rem; }
+    #rm-notify-ok:hover { background: rgba(200,140,60,0.95); }
+
+    /* ゲームオーバーレイ */
+    #game-overlay { display: none; position: fixed; inset: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.78); z-index: 200; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
+    #game-popup { background: #1a1008; border: 1px solid rgba(212,168,122,0.4); border-radius: 12px; width: 100%; max-width: 500px; display: flex; flex-direction: column; }
+    #game-header { display: flex; align-items: center; justify-content: flex-end; padding: 4px 6px; flex-shrink: 0; }
+    #game-title { display: none; }
+    #game-close { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(212,168,122,0.4); background: rgba(60,30,10,0.8); color: #d4a87a; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    #game-close:hover { background: rgba(100,50,15,0.9); }
+    #game-content { padding: 6px 10px 10px; color: #fff; font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; }
+    .gm-wrap { display: flex; flex-direction: row; gap: 8px; align-items: flex-start; }
+    .gm-left { width: 88px; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; }
+    .gm-right { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+    .gm-select { width: 100%; background: rgba(20,40,20,0.8); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; padding: 3px 5px; font-size: 0.72rem; outline: none; cursor: pointer; }
+    .gm-btn { width: 100%; padding: 5px 4px; border: none; border-radius: 6px; font-size: 0.72rem; font-weight: bold; cursor: pointer; transition: filter 0.15s, transform 0.1s; }
+    .gm-btn:active { transform: scale(0.96); }
+    .gm-btn:disabled { filter: brightness(0.45); cursor: default; transform: none; }
+    .gm-btn-gold { background: #c9a227; color: #1a1a1a; } .gm-btn-gold:not(:disabled):hover { filter: brightness(1.15); }
+    .gm-btn-blue { background: #2980b9; color: #fff; } .gm-btn-blue:not(:disabled):hover { filter: brightness(1.15); }
+    .gm-btn-red  { background: #c0392b; color: #fff; } .gm-btn-red:not(:disabled):hover  { filter: brightness(1.15); }
+    .gm-info { font-size: 0.68rem; line-height: 1.4; opacity: 0.85; word-break: break-all; }
+    .gm-result-win  { color: #f1c40f; font-weight: bold; }
+    .gm-result-lose { color: #e74c3c; font-weight: bold; }
+    .gm-result-draw { color: #74b9ff; font-weight: bold; }
+    .pk-hand-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; opacity: 0.5; margin-bottom: 2px; }
+    .pk-cards { display: flex; gap: 3px; justify-content: flex-start; flex-wrap: nowrap; align-items: flex-end; margin-bottom: 6px; padding-top: 14px; }
+    .pk-card { background: #fff; border-radius: 6px; display: flex; flex-direction: column; justify-content: space-between; padding: 3px 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); position: relative; user-select: none; color: #1a1a1a; transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0; }
+    .pk-card.pk-red { color: #c0392b; }
+    .pk-card.pk-selected { transform: translateY(-10px); box-shadow: 0 6px 12px rgba(0,0,0,0.6); outline: 2px solid #f1c40f; }
+    .pk-card.pk-back { background: repeating-linear-gradient(135deg,#1a3a8c 0,#1a3a8c 5px,#1e44a8 5px,#1e44a8 10px); cursor: default; }
+    .pk-corner { display: flex; flex-direction: column; line-height: 1.1; font-weight: bold; }
+    .pk-bottom { align-self: flex-end; transform: rotate(180deg); }
+    .pk-suit-lg { text-align: center; line-height: 1; }
+    .pk-exchange-badge { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: #e74c3c; color: #fff; font-size: 0.55rem; font-weight: bold; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
+    .pk-hand-name { font-size: 0.7rem; font-weight: bold; color: #f1c40f; min-height: 1em; }
+    .pk-detail { font-size: 0.6rem; opacity: 0.6; min-height: 0.9em; }
+    .cn-board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+    .cn-card { display: flex; align-items: center; justify-content: center; border-radius: 5px; user-select: none; text-align: center; transition: transform 0.12s; }
+    .cn-card-back { background: repeating-linear-gradient(135deg,#1a3a8c 0,#1a3a8c 4px,#1e44a8 4px,#1e44a8 8px); color: rgba(255,255,255,0.4); }
+    .cn-card-back:hover { transform: scale(1.06); }
+    .cn-card-front { background: #fff; color: #1a1a1a; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+    .cn-card-matched { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.3); outline: 1px solid rgba(255,255,255,0.12); }
+    .rv-canvas-wrap { display: flex; justify-content: flex-start; }
+    .rv-canvas-wrap canvas { display: block; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene-canvas"></canvas>
+
+    <!-- 吹き出し: chara1（上部中央）/ chara2（上部左） -->
+    <div id="bubble-chara1" class="bubble"></div>
+    <div id="bubble-chara2" class="bubble"></div>
+
+    <button id="mic-btn" title="タップして話す">🎤</button>
+    <div id="status-label">タップして話す</div>
+    <div id="theme-label">☕ Cafe Lumiere</div>
+    <audio id="bgm-audio" loop preload="auto" data-volume="0.3"></audio>
+
+    <!-- チャットパネル -->
+    <div id="chat-panel">
+      <div id="chat-history"></div>
+      <div id="chat-input-area">
+        <input id="chat-input" type="text" placeholder="メッセージを入力..." maxlength="100" autocomplete="off">
+        <button id="chat-send" title="送信">➤</button>
+      </div>
+    </div>
+    <button id="chat-toggle" title="チャット">💬</button>
+
+    <!-- リマインダーパネル -->
+    <div id="rm-overlay">
+      <div id="rm-panel">
+        <h3>⏰ リマインダー
+          <button onclick="ReminderPanel.close()">✕</button>
+        </h3>
+        <div id="rm-list"></div>
+        <div id="rm-add-form">
+          <input id="rm-input-name" type="text" maxlength="20" placeholder="イベント名（20文字以内）">
+          <input id="rm-input-time" type="time">
+          <select id="rm-input-repeat">
+            <option value="daily">毎日</option>
+            <option value="once">１度のみ</option>
+          </select>
+          <button id="rm-add-btn" onclick="ReminderPanel.add()">＋ 追加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- リマインダー通知 -->
+    <div id="rm-notify">
+      <div id="rm-notify-box">
+        <div id="rm-notify-icon">⏰</div>
+        <div id="rm-notify-name"></div>
+        <button id="rm-notify-ok" onclick="ReminderPanel.dismissNotify()">OK</button>
+      </div>
+    </div>
+
+    <!-- ゲームボタン -->
+    <div id="game-buttons">
+      <button class="game-btn" onclick="ReminderPanel.open()" title="リマインダー設定">⏰</button>
+      <button class="game-btn" onclick="GamePopup.open('poker')" title="ドローポーカー">🃏</button>
+      <button class="game-btn" onclick="GamePopup.open('concentration')" title="神経衰弱">🎴</button>
+      <button class="game-btn" onclick="GamePopup.open('reversi')" title="リバーシ">⚫</button>
+    </div>
+
+    <!-- ゲームオーバーレイ -->
+    <div id="game-overlay">
+      <div id="game-popup">
+        <div id="game-header">
+          <span id="game-title"></span>
+          <button id="game-close" onclick="GamePopup.close()">✕</button>
+        </div>
+        <div id="game-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="scene.js"></script>
+  <script src="ws_client.js"></script>
+  <script src="voice.js"></script>
+  <script src="games/game_poker.js"></script>
+  <script src="games/game_concentration.js"></script>
+  <script src="games/game_reversi.js"></script>
+  <script src="game_popup.js"></script>
+  <script src="game_rin_comment.js"></script>
+  <script src="reminder.js"></script>
+</body>
+</html>

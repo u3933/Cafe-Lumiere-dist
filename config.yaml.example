@@ -1,0 +1,189 @@
+# Cafe Lumiere - 配布版設定テンプレート (vA1)
+# このファイルを config.yaml にリネームして使用してください
+
+websocket:
+  host: "0.0.0.0"
+  port: 8765
+
+# ============================================================
+# LLM設定
+# ============================================================
+llm:
+  provider: "gemini"               # "openai" | "gemini"
+  endpoint: "http://localhost:8080/v1/chat/completions"
+  api_key: ""
+  model: "default"
+  max_tokens: 512
+  temperature: 0.8
+  stream: true
+  gemini_model: "gemini-2.0-flash"
+
+# ============================================================
+# STT設定
+# ============================================================
+stt:
+  provider: "browser"
+  language: "ja-JP"
+  endpoint: "http://localhost:5001/whisper"
+  timeout: 10
+
+# ============================================================
+# TTS設定
+# ============================================================
+tts:
+  provider: "voicevox"
+  voicevox_endpoint: "http://localhost:50021"
+  mia_speaker_id: 3
+  master_speaker_id: 2
+  speed_scale: 1.0
+  pitch_scale: 0.0
+  endpoint: "http://localhost:5000"
+  mia_model_name: "woman001"
+  master_model_name: "man001"
+  speed: 1.0
+  style_weight: 1.0
+  dict_file: "tts_dict.yaml"
+
+# ============================================================
+# BGM設定
+#
+# dist版はブラウザ側（Web Audio API）で再生するため enabled: false が正しい。
+# enabled: true にするとサーバー側でも pygame による再生が試みられる（通常不要）。
+#
+# schedules: 時間帯別BGMを最大3件（ブラウザ再生用）
+#   ファイルが1種類なら start: 0 を1件だけ指定する。
+# ============================================================
+bgm:
+  enabled: false                     # サーバー側 pygame 再生は無効（ブラウザ側で再生）
+  volume: 0.1
+  schedules:
+    - file: "assets/bgm/cafe_bgm_morning.mp3"
+      start: 6                       # 6時〜
+    - file: "assets/bgm/cafe_bgm.mp3"
+      start: 13                      # 13時〜
+    - file: "assets/bgm/cafe_bgm_night.mp3"
+      start: 22                      # 22時〜
+
+# ============================================================
+# キャラクター画像設定
+#
+# chara1 / chara2 の2キャラ固定。
+# 各キャラ最大6枚まで pool に登録できる。
+#
+# layer: 描画レイヤー番号（後ろ→前の順）
+#   2 = 背景直前（マスターより後ろ）
+#   3 = マスターと同列（master用に使用）
+#   5 = 前景オブジェクトの手前
+#
+# condition（省略可）:
+#   sunny_daytime … 晴れの昼〜夕方のみ出現（省略時は常時）
+#   late_night    … 深夜専用（23時〜6時のみ）
+#
+# late_night_pool（省略可）:
+#   深夜帯に使用する専用プール。省略時は pool をそのまま使用。
+# ============================================================
+characters:
+  chara1:
+    pool:
+      - file: "chara1_front1.png"
+        layer: 5
+      - file: "chara1_front2.png"
+        layer: 5
+      - file: "chara1_front3.png"
+        layer: 5
+      - file: "chara1_clean.png"
+        layer: 5
+      - file: "chara1_rest.png"
+        layer: 3
+        condition: sunny_daytime   # 晴れの昼〜夕方のみ出現
+    # 深夜専用プール
+    late_night_pool:
+      - file: "chara1_sleep.png"
+        layer: 2
+
+  chara2:
+    pool:
+      - file: "chara2_front.png"
+        layer: 3
+      - file: "chara2_back.png"
+        layer: 3
+
+# ============================================================
+# 背景・固定レイヤー画像設定
+# ============================================================
+scene_images:
+  bg_indoor: "bg_indoor.png"         # 室内背景（常時表示）
+  obj_mid:   "obj_mid.png"           # 中景オブジェクト（常時表示）
+  obj_front: "obj_front.png"         # 前景オブジェクト（常時表示）
+  # 風景（天気・時間帯で自動切り替え）
+  scenery:
+    day:       "scenery_day.png"
+    dawn:      "scenery_dawn.png"
+    evening:   "scenery_evening.png"
+    night:     "scenery_night.png"
+    latenight: "scenery_latenight.png"
+    cloudy:    "scenery_cloudy.png"
+    rain:      "scenery_rain.png"
+
+# HTTP静的ファイルサーバ
+http:
+  port: 8766
+
+# SSL（Tailscaleなどで証明書を取得した場合に設定）
+# ssl:
+#   cert: "/path/to/cert.pem"
+#   key:  "/path/to/key.pem"
+
+# テーマ設定
+theme:
+  themes_file: "themes.yaml"
+
+# Gemini API
+gemini:
+  api_key: "YOUR_GEMINI_API_KEY"
+  model: "gemini-2.0-flash"
+  grounding: true
+  fetch_interval: 3600
+
+# GeneratorAgent設定
+generator:
+  idle_timeout: 300
+  scenario_buffer_min: 2
+  scenario_buffer_max: 5
+  scenario_buffer_refill_interval: 30
+  context_window: 10
+  late_night_start: 23
+  late_night_end: 6
+
+# 長期記憶
+memory:
+  db_path: "data/memory.db"
+  extract_interval: 5
+  max_memories_in_prompt: 10
+  initial_memories:
+    - category: fact
+      content: "名前はまだ知らない"
+    - category: preference
+      content: "コーヒーが好きそう"
+
+# 記憶管理Webツール
+memory_server:
+  port: 8767
+
+# 天気連動
+weather:
+  enabled: true
+  latitude: 35.6762
+  longitude: 139.6503
+  fetch_interval: 1800
+
+# SpeakerAgent設定
+speaker:
+  filler_threshold_ms: 1000
+  inter_line_pause: 0.8
+
+# キューサイズ
+queues:
+  ws_voice_queue_maxsize: 5
+  voice_queue_maxsize: 10
+  output_queue_maxsize: 10

@@ -1,0 +1,42 @@
+# TTS 読み辞書
+# 形式: 表記: かな読み
+
+words:
+  # IT用語
+  Python: ぱいそん
+  API: えーぴーあい
+  AI: えーあい
+  TTS: てぃーてぃーえす
+  STT: えすてぃーてぃー
+  BGM: びーじーえむ
+  LLM: えるえるえむ
+  GPU: じーぴーゆー
+  CPU: しーぴーゆー
+  PC: ぴーしー
+  Wi-Fi: わいふぁい
+  WiFi: わいふぁい
+  WebSocket: うぇぶそけっと
+  GitHub: ぎっとはぶ
+  VOICEVOX: ぼいすぼっくす
+
+  # Cafe Lumiere固有名詞
+  Cafe: かふぇ
+  Lumiere: るみえーる
+  Mia: みあ
+  Master: ますたー
+
+  # コーヒー用語
+  Espresso: えすぷれっそ
+  espresso: えすぷれっそ
+  Latte: らって
+  latte: らって
+  Cappuccino: かぷちーの
+  cappuccino: かぷちーの
+
+  # 一般
+  the: ざ
+  menu: めにゅー
+  cafe: かふぇ
+  Las: らす
+  Fallas: ふぁじゃす
+  Holi: ほーりー
