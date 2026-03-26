@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Cafe Lumiere ☕ — 配布版 (vA1)
 
 AIが営むカフェを舞台にした、放置型音声会話アプリ。
@@ -227,3 +228,7 @@ SOFTWARE.
 | [Open-Meteo](https://open-meteo.com/) | [CC BY 4.0](https://open-meteo.com/en/terms) — 天気データ取得に使用 |
 
 VOICEVOXの各キャラクターには個別の利用規約があります。商用利用可否やクレジット表記の要否はキャラクターごとに異なるため、使用するキャラクターの規約を必ずご確認ください。
+=======
+# Cafe-Lumiere-dist
+AIが営むカフェで、いつでも話しかけられる放置型音声チャット
+>>>>>>> 28315979e1f74c2ba60674f65720748b3eef9b61
