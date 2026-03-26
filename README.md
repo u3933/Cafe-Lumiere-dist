@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Cafe Lumiere ☕ — 配布版 (vA1)
 
 AIが営むカフェを舞台にした、放置型音声会話アプリ。
@@ -24,7 +23,7 @@ AIが営むカフェを舞台にした、放置型音声会話アプリ。
 
 ### 1. リポジトリをダウンロード
 ```bash
-git clone https://github.com/YOUR_USERNAME/Cafe-Lumiere-dist.git
+git clone https://github.com/u3933/Cafe-Lumiere-dist.git
 cd Cafe-Lumiere-dist
 ```
 
@@ -134,17 +133,17 @@ llm:
 
 ## アセットの配置
 
-以下のフォルダに画像・BGMを配置してください（著作権フリー素材を各自用意）。
+以下のフォルダに画像・BGMを配置してください（BGMは著作権フリー素材を各自用意）。
 詳細は [docs/setup.md](docs/setup.md) を参照。
 
 ```
 assets/
-  bgm/         ← BGMファイル（.mp3）
-  image/       ← 背景・風景画像（960×540px PNG推奨）
-  character/   ← キャラクター画像（960×540px 背景透過PNG推奨）
+  bgm/         ← BGMファイル（.mp3）各自用意
+  image/       ← 背景・風景画像（サンプル同梱）
+  character/   ← キャラクター画像（サンプル同梱）
 ```
 
-サンプルアセット（`assets/` 同梱）はAI生成物を加工したものです。
+サンプルアセット（`assets/image/`・`assets/character/` 同梱）はAI生成物を加工したものです。
 著作権を主張せず、商用・非商用を問わず自由に利用・改変できます。
 
 ---
@@ -197,7 +196,7 @@ SOFTWARE.
 
 ### サンプルアセット
 
-`assets/` フォルダ内のサンプルアセット（画像・BGM）はAI生成物を加工したものです。
+`assets/image/`・`assets/character/` フォルダ内のサンプルアセットはAI生成物を加工したものです。
 著作権を主張せず、商用・非商用を問わず自由に利用・改変できます。
 
 ### フォント
@@ -228,7 +227,3 @@ SOFTWARE.
 | [Open-Meteo](https://open-meteo.com/) | [CC BY 4.0](https://open-meteo.com/en/terms) — 天気データ取得に使用 |
 
 VOICEVOXの各キャラクターには個別の利用規約があります。商用利用可否やクレジット表記の要否はキャラクターごとに異なるため、使用するキャラクターの規約を必ずご確認ください。
-=======
-# Cafe-Lumiere-dist
-AIが営むカフェで、いつでも話しかけられる放置型音声チャット
->>>>>>> 28315979e1f74c2ba60674f65720748b3eef9b61
