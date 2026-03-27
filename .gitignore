@@ -9,6 +9,7 @@ __pycache__/
 .venv/
 venv/
 env/
+certs/
 
 # 設定ファイル（APIキー・個人情報を含む）
 config.yaml

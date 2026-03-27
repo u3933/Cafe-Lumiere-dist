@@ -109,6 +109,20 @@ llm:
 
 ---
 
+## iPhoneでの利用（推奨手順）
+
+iPhoneからマイク入力を使うには **Chrome でPWAとしてホーム画面に追加する**のが確実です。
+
+1. iPhone の **Chrome** でアプリのURLを開く（https接続が必要）
+2. アドレスバー右の共有ボタン → **「ホーム画面に追加」**
+3. ホーム画面のアイコンから起動 → フルスクリーン＋マイク入力OK
+
+> **Safari ではPWA起動時にWeb Speech APIが動作しない場合があります。** iPhoneでマイクを使う場合はChromeを推奨します。
+
+https接続の設定方法は [docs/setup.md](docs/setup.md) のSSL設定を参照してください。
+
+---
+
 ## GPUは不要
 
 | コンポーネント | 動作 |
@@ -153,8 +167,11 @@ assets/
 **VOICEVOXの音声が出ない**
 → VOICEVOXアプリが起動しているか確認。`http://localhost:50021/version` にアクセスできればOK。
 
-**マイクが動かない**
-→ ブラウザのマイク許可を確認。iOSはhttpsが必要（[docs/setup.md](docs/setup.md) のSSL設定を参照）。
+**iPhoneでマイクが動かない**
+→ Safari ではなく **Chrome** でアクセスし、PWAとしてホーム画面に追加してください。https接続が必要です（[docs/setup.md](docs/setup.md) のSSL設定を参照）。
+
+**マイクが動かない（PC）**
+→ ブラウザのマイク許可を確認してください。
 
 **LLMがエラーを返す**
 → `config.yaml` の `llm.endpoint` と `api_key` を確認。

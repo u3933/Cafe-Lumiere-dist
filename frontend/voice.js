@@ -21,6 +21,9 @@ let silenceCheckTimer = null;
 let analyser         = null;
 let micStream        = null;
 
+// Web Speech API の recognition インスタンスをスコープ外に保持（abort用）
+let _recognition = null;
+
 // STTプロバイダー（/api/config から取得）
 let sttProvider = 'browser';
 let sttLanguage = 'ja-JP';
@@ -47,9 +50,15 @@ micBtn.addEventListener('click', async () => {
     } else {
       await startRecording();
     }
-  } else if (state === 'recording' && sttProvider !== 'browser') {
-    stopRecording();
+  } else if (state === 'recording') {
+    // browser / whisper 両モード共通で録音中タップ → 強制停止
+    if (sttProvider === 'browser') {
+      stopRecordingBrowser();
+    } else {
+      stopRecording();
+    }
   }
+  // processing 中はタップ無効
 });
 
 // ============================================================
@@ -62,7 +71,15 @@ async function startRecordingBrowser() {
     return;
   }
 
+  // 前回のインスタンスが残っていたら中断
+  if (_recognition) {
+    try { _recognition.abort(); } catch(e) {}
+    _recognition = null;
+  }
+
   const recognition = new SR();
+  _recognition = recognition;
+
   recognition.lang             = sttLanguage;
   recognition.interimResults   = false;
   recognition.maxAlternatives  = 1;
@@ -70,6 +87,7 @@ async function startRecordingBrowser() {
   window.updateMicState('recording');
 
   recognition.onresult = (e) => {
+    _recognition = null;
     const text = e.results[0][0].transcript.trim();
     if (text) {
       window.sendWS({ type: 'text_input', message: text, username: USERNAME });
@@ -90,11 +108,18 @@ async function startRecordingBrowser() {
 
   recognition.onerror = (e) => {
     console.warn('Web Speech API エラー:', e.error);
-    window.updateMicState('idle');
+    _recognition = null;
+    // aborted は手動停止なので無視。それ以外は必ずidleに戻す
+    if (e.error !== 'aborted') {
+      window.updateMicState('idle');
+    }
   };
 
   recognition.onend = () => {
+    _recognition = null;
+    // recording のままなら（onresult/onerror が来なかった場合）強制復帰
     if (window.AppState?.micState === 'recording') {
+      console.warn('recognition.onend: recording のまま終了 → idle に復帰');
       window.updateMicState('idle');
     }
   };
@@ -103,8 +128,18 @@ async function startRecordingBrowser() {
     recognition.start();
   } catch (e) {
     console.error('SpeechRecognition start error:', e);
+    _recognition = null;
     window.updateMicState('idle');
   }
+}
+
+// Web Speech API の手動停止
+function stopRecordingBrowser() {
+  if (_recognition) {
+    try { _recognition.abort(); } catch(e) {}
+    _recognition = null;
+  }
+  window.updateMicState('idle');
 }
 
 // ============================================================

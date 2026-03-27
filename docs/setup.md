@@ -13,8 +13,9 @@
 7. [キャラクター設定](#キャラクター設定)
 8. [ペルソナ設定](#ペルソナ設定)
 9. [記憶・初期設定](#記憶初期設定)
-10. [SSL / HTTPS設定](#ssl--https設定)
-11. [ファイル構成まとめ](#ファイル構成まとめ)
+10. [iPhoneでの利用](#iphoneでの利用)
+11. [SSL / HTTPS設定](#ssl--https設定)
+12. [ファイル構成まとめ](#ファイル構成まとめ)
 
 ---
 
@@ -370,6 +371,27 @@ memory:
 
 ---
 
+## iPhoneでの利用
+
+iPhoneからマイク入力を使う場合は **Chrome でPWAとしてホーム画面に追加する**のが確実です。
+
+**手順:**
+
+1. iPhone の **Chrome** でアプリのURL（https）を開く
+2. アドレスバー右の共有ボタン → **「ホーム画面に追加」**
+3. ホーム画面のアイコンから起動 → フルスクリーン＋マイク入力OK
+
+**Safari を推奨しない理由:**
+
+- Safari でURLを直接開く → アドレスバーで画面下部が切れ、マイクボタンが表示されない
+- Safari でPWAとして起動 → フルスクリーンになるが、Web Speech APIが正常に動作しないケースがある
+
+Chrome PWAとしてインストールすることでフルスクリーン表示とマイク入力の両方が解決します。
+
+https接続の設定方法は次のSSL設定セクションを参照してください。
+
+---
+
 ## SSL / HTTPS設定
 
 iOSでマイクを使用するにはhttpsが必要です。
@@ -382,6 +404,10 @@ ssl:
 ```
 
 証明書を設定するとWebSocketも自動的に `wss://` に切り替わります。
+
+**Tailscaleを使う場合:**
+
+Tailscale の MagicDNS + HTTPS Certificates 機能を使うと、Let's Encrypt の証明書を自動取得・更新できます。ローカルネットワーク内のPCへスマホから接続する際に便利です。
 
 ---
 
@@ -402,7 +428,7 @@ Cafe-Lumiere-dist/
 │   │   ├── cafe_bgm.mp3
 │   │   ├── cafe_bgm_morning.mp3
 │   │   └── cafe_bgm_night.mp3
-│   ├── image/               ★ 背景・風景画像（各自用意）
+│   ├── image/               背景・風景画像（サンプル同梱）
 │   │   ├── bg_indoor.png        室内背景
 │   │   ├── obj_mid.png          中景オブジェクト
 │   │   ├── obj_front.png        前景オブジェクト
@@ -413,7 +439,7 @@ Cafe-Lumiere-dist/
 │   │   ├── scenery_latenight.png 深夜の風景
 │   │   ├── scenery_cloudy.png   曇りの風景
 │   │   └── scenery_rain.png     雨の風景
-│   └── character/           ★ キャラクター画像（各自用意）
+│   └── character/           キャラクター画像（サンプル同梱）
 │       ├── rin_mid_1.png        （chara1 デフォルト設定）
 │       ├── rin_mid_2.png
 │       ├── rin_mid_3.png
@@ -435,8 +461,6 @@ Cafe-Lumiere-dist/
 └── src/                     バックエンド（変更不要）
 ```
 
-**★マークのついたフォルダが各自で用意するアセットの配置場所です。**
-
 ---
 
 ## トラブルシューティング
@@ -444,8 +468,8 @@ Cafe-Lumiere-dist/
 **音声が出ない**
 → VOICEVOXが起動しているか確認。`http://localhost:50021/version` でバージョンが表示されればOK。
 
-**マイクが動かない（iOS）**
-→ httpsが必要です。SSL設定を行い、`https://` でアクセスしてください。
+**iPhoneでマイクが動かない**
+→ Safari ではなく **Chrome** でアクセスし、PWAとしてホーム画面に追加してください。https接続が必要です（上記SSL設定を参照）。
 
 **マイクが動かない（PC）**
 → ブラウザのアドレスバーのカメラアイコンからマイクのアクセス許可を確認してください。
