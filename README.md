@@ -19,81 +19,45 @@ AIが営むカフェを舞台にした、放置型音声会話アプリ。
 
 ---
 
-## セットアップ（5ステップ）
+## セットアップ（3ステップ）
 
 ### 1. リポジトリをダウンロード
 ```bash
 git clone https://github.com/u3933/Cafe-Lumiere-dist.git
 cd Cafe-Lumiere-dist
-```
-
-### 2. Pythonパッケージをインストール
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. VOICEVOXを起動
-VOICEVOXアプリを起動し、そのままにしておく（`http://localhost:50021` で待受）
-
-### 4. config.yamlを設定
-```bash
-cp config.yaml.example config.yaml
-```
-`config.yaml` を開いてGemini APIキーを設定：
-
-```yaml
-llm:
-  provider: "gemini"
-
-gemini:
-  api_key: "YOUR_GEMINI_API_KEY"  # ← ここに入力
-```
-
-### 5. 起動
+### 2. アプリを起動
 ```bash
 python main.py
 ```
 
+`config.yaml` が存在しない場合は `config.yaml.example` から自動コピーされます。
+
+### 3. セットアップウィザードで設定
+ブラウザで `http://localhost:8766/setup_wizard/` を開き、各項目を設定してダウンロード。
+
+```
+⚙️ 環境設定（config.yaml）
+  └ LLM・TTS・BGM・画面・天気・背景/キャラクター画像を設定
+
+🎭 AIペルソナ設定（persona.yaml）
+  └ キャラクターの名前・口調・プロンプトを設定
+
+🌏 世界観設定（themes.yaml）
+  └ 放置時に話す話題テーマを設定
+```
+
+ダウンロードしたYAMLファイルをプロジェクトルートに配置し、`main.py` を再起動。
+
 ブラウザで `http://localhost:8766/` を開く（スマホは横画面推奨）。
 
----
-
-## LLM別の設定例
-
-### Gemini API（推奨）
-```yaml
-llm:
-  provider: "gemini"
-gemini:
-  api_key: "YOUR_GEMINI_API_KEY"
-```
-
-### OpenAI API
-```yaml
-llm:
-  provider: "openai"
-  endpoint: "https://api.openai.com/v1/chat/completions"
-  api_key: "sk-..."
-  model: "gpt-4o-mini"
-```
-
-### llama.cpp / LM Studio
-```yaml
-llm:
-  provider: "openai"
-  endpoint: "http://localhost:8080/v1/chat/completions"
-  api_key: ""
-  model: "default"
-```
-
-### Ollama
-```yaml
-llm:
-  provider: "openai"
-  endpoint: "http://localhost:11434/v1/chat/completions"
-  api_key: ""
-  model: "llama3.2"
-```
+> **ウィザードの便利な機能（アプリ経由のみ）**
+> - TTS音声テスト（chara1 / chara2 を実際に再生して確認）
+> - BGM再生テスト
+> - 背景・キャラクター画像のレイヤープレビュー
+> - 地域名からの緯度経度自動検索
 
 ---
 
@@ -102,6 +66,7 @@ llm:
 | 用途 | URL |
 |---|---|
 | カフェアプリ | `http://localhost:8766/` |
+| セットアップウィザード | `http://localhost:8766/setup_wizard/` |
 | 記憶管理ツール | `http://localhost:8767/` |
 
 - スマートフォンは横画面（landscape）で開く
@@ -174,7 +139,7 @@ assets/
 → ブラウザのマイク許可を確認してください。
 
 **LLMがエラーを返す**
-→ `config.yaml` の `llm.endpoint` と `api_key` を確認。
+→ ウィザードで設定した `llm.endpoint` と `api_key` を確認。
 
 **Ollamaで応答しない**
 → `model` にOllamaで実行中のモデル名（例: `llama3.2`）を設定してください。
@@ -231,6 +196,7 @@ SOFTWARE.
 | [PyYAML](https://github.com/yaml/pyyaml) | MIT | YAML設定ファイル読み込み |
 | [FastAPI](https://github.com/fastapi/fastapi) | MIT | 記憶管理WebツールAPI |
 | [uvicorn](https://github.com/encode/uvicorn) | BSD 3-Clause | ASGIサーバ |
+| numpy | BSD 3-Clause | TTS音量増幅 |
 | sqlite3 | Python標準ライブラリ（PSF） | 長期記憶データベース |
 
 フロントエンドはブラウザ標準API（Web Speech API / Web Audio API / Canvas 2D）のみを使用しており、外部JavaScriptライブラリへの依存はありません。

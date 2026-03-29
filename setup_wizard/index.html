@@ -629,7 +629,12 @@ speaker:
 queues:
   ws_voice_queue_maxsize: 5
   voice_queue_maxsize: 10
-  output_queue_maxsize: 10`.trim();
+  output_queue_maxsize: 10
+
+# SSL（Tailscaleなどで証明書を取得した場合に設定）
+# ssl:
+#   cert: "/path/to/cert.pem"
+#   key:  "/path/to/key.pem"`.trim();
 }
 
 async function testTts(chara) {
