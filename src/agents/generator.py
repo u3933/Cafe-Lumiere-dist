@@ -1,5 +1,8 @@
 """
-GeneratorAgent (vA1 - 本編と同一)
+GeneratorAgent (vA1)
+
+世界観に関するハードコード要素はすべて persona.yaml の world セクションで管理する。
+コードを変更せずに world セクションを書き換えるだけで世界観を切り替えられる。
 """
 import asyncio
 import json
@@ -21,31 +24,6 @@ logger = logging.getLogger(__name__)
 
 class GeneratorAgent:
 
-    _MASTER_KEYWORDS = ["マスター", "大将", "店長", "オーナー"]
-
-    _FALLBACK_DIALOGUES = [
-        [
-            {"speaker": "mia",    "text": "マスター、最近新しいコーヒー豆は入りましたか？"},
-            {"speaker": "master", "text": "そうそう、エチオピアのイエルガチェフェが届いたよ。フルーティな香りが特徴でね。"},
-        ],
-        [
-            {"speaker": "mia",    "text": "マスター、今日のおすすめってどれですか？"},
-            {"speaker": "master", "text": "コロンビア産のナリーニョがいいかな。甘みと酸味のバランスがちょうどいいよ。"},
-        ],
-        [
-            {"speaker": "mia",    "text": "マスター、コーヒーの香りって本当に落ち着きますよね。"},
-            {"speaker": "master", "text": "うん、豆を挽いた瞬間の香りは特別だよね。"},
-        ],
-        [
-            {"speaker": "mia",    "text": "マスター、ラテアートって難しいですか？"},
-            {"speaker": "master", "text": "コツは注ぎの速度にあるんだよ。練習すれば誰でもできるよ。"},
-        ],
-        [
-            {"speaker": "mia",    "text": "マスター、今日はお客さん多いですね。"},
-            {"speaker": "master", "text": "天気がいいからかな。コーヒーを丁寧に出すのが一番だよ。"},
-        ],
-    ]
-
     def __init__(self, voice_queue: asyncio.Queue, output_queue: asyncio.Queue,
                  config: dict, theme_manager=None, ws_server=None, shutdown_event=None,
                  theme_fetcher=None, memory_manager=None):
@@ -62,6 +40,26 @@ class GeneratorAgent:
         self.llm     = LLMClient(config)
         self.context = ContextManager(config)
         self.persona = self._load_persona()
+
+        # persona.yaml の world セクションから世界観を読み込む
+        world = self.persona.get("world", {})
+        self._master_keywords   = world.get("master_keywords", ["マスター", "オーナー"])
+        self._welcome           = world.get("welcome", [
+            {"speaker": "mia",    "text": "いらっしゃいませ。"},
+            {"speaker": "master", "text": "ゆっくりしていってください。"},
+        ])
+        self._welcome_late_night = world.get("welcome_late_night", [
+            {"speaker": "master", "text": "いらっしゃい。ゆっくりしていって。"},
+        ])
+        self._mia_followup_prompt = world.get("mia_followup_prompt",
+            "マスターが「{master_response}」と言いました。Miaとして一言だけ短く添えてください。1文のみ。テキストのみ出力。"
+        )
+        self._fallback_dialogues = world.get("fallback_dialogues", [
+            [
+                {"speaker": "mia",    "text": "……。"},
+                {"speaker": "master", "text": "……。"},
+            ]
+        ])
 
         self._scenario_buffer: ScenarioBuffer | None = None
         self._monologue_buffer: ScenarioBuffer | None = None
@@ -131,10 +129,10 @@ class GeneratorAgent:
 
     def _build_comment_response_prompt(self, user_message: str) -> str:
         return self._build_prompt("comment_response", {
-            "user_message":      user_message,
-            "context":           self.context.get_context_summary(),
-            "persona":           self._get_mia_persona_str(),
-            "memory_summary":    self._get_memory_summary(),
+            "user_message":       user_message,
+            "context":            self.context.get_context_summary(),
+            "persona":            self._get_mia_persona_str(),
+            "memory_summary":     self._get_memory_summary(),
             "real_world_context": world_state.get_context_str(),
         })
 
@@ -183,17 +181,14 @@ class GeneratorAgent:
         logger.info("🛑 Generator Agent 停止")
 
     async def on_client_connected(self):
+        """クライアント接続時のウェルカムメッセージ（persona.yaml の world セクションから読み込む）"""
         await asyncio.sleep(0.8)
-        if self._is_late_night():
-            welcome = [{"speaker": "master", "text": "いらっしゃい。静かな時間だけど、ゆっくりしていって。"}]
-        else:
-            welcome = [
-                {"speaker": "mia",    "text": "いらっしゃいませ！Cafe Lumiereへようこそ。"},
-                {"speaker": "master", "text": "ゆっくりしていってください。"},
-            ]
+        welcome = self._welcome_late_night if self._is_late_night() else self._welcome
         for line in welcome:
             await self.output_queue.put(TextChunk(
-                text=line["text"], emotion=self._detect_emotion(line["text"]), speaker=line["speaker"]
+                text=line["text"],
+                emotion=self._detect_emotion(line["text"]),
+                speaker=line["speaker"],
             ))
         logger.info("👋 ウェルカムメッセージ送出")
 
@@ -207,17 +202,17 @@ class GeneratorAgent:
         logger.info(f"🕐 掛け合い開始 (buffer={self._scenario_buffer.qsize()}件)")
         exchange = self._scenario_buffer.get_nowait()
         if exchange is None:
-            logger.info("📦 バッファ空 — 固定フォールバック使用")
-            exchange = random.choice(self._FALLBACK_DIALOGUES)
+            logger.info("📦 バッファ空 — フォールバック使用")
+            exchange = random.choice(self._fallback_dialogues)
         for line in exchange:
             text = line["text"]
             await self.output_queue.put(TextChunk(
                 text=text, emotion=self._detect_emotion(text), speaker=line["speaker"]
             ))
-            icon = "💬" if line["speaker"] == "mia" else "☕"
+            icon = "💬" if line["speaker"] == "mia" else "🏠"
             logger.info(f"{icon} {line['speaker'].title()}: {text[:50]}")
         if len(exchange) >= 2:
-            self.context.add_exchange([f"[Mia] {exchange[0]['text']}"], f"[Master] {exchange[-1]['text']}")
+            self.context.add_exchange([f"[chara1] {exchange[0]['text']}"], f"[chara2] {exchange[-1]['text']}")
 
     async def _idle_monologue(self):
         logger.info(f"🌙 独り言開始 (buffer={self._monologue_buffer.qsize()}件)")
@@ -229,12 +224,15 @@ class GeneratorAgent:
             if line["speaker"] != "master":
                 continue
             text = line["text"]
-            await self.output_queue.put(TextChunk(text=text, emotion=self._detect_emotion(text), speaker="master"))
+            await self.output_queue.put(TextChunk(
+                text=text, emotion=self._detect_emotion(text), speaker="master"
+            ))
             logger.info(f"🌙 Master: {text[:50]}")
 
     def _is_addressed_to_master(self, message: str) -> bool:
+        """メッセージ冒頭10文字に chara2 への呼びかけがあるか検出（persona.yaml から読み込む）"""
         head = message[:10]
-        return any(kw in head for kw in self._MASTER_KEYWORDS)
+        return any(kw in head for kw in self._master_keywords)
 
     async def _respond_to_user(self, msg: ChatMessage):
         if self._is_late_night():
@@ -246,7 +244,7 @@ class GeneratorAgent:
 
     async def _respond_as_master_solo(self, msg: ChatMessage):
         user_message = msg.message
-        logger.info(f"🌙 深夜モード — Master単独応答: 「{user_message[:30]}」")
+        logger.info(f"🌙 深夜モード — chara2単独応答: 「{user_message[:30]}」")
         prompt = self._build_prompt("master_solo_response", {
             "user_message":       user_message,
             "context":            self.context.get_context_summary(),
@@ -263,7 +261,9 @@ class GeneratorAgent:
         if response:
             for s in self._split_into_sentences(response):
                 if s.strip():
-                    await self.output_queue.put(TextChunk(text=s.strip(), emotion=self._detect_emotion(s), speaker="master"))
+                    await self.output_queue.put(TextChunk(
+                        text=s.strip(), emotion=self._detect_emotion(s), speaker="master"
+                    ))
             self.context.add_exchange([user_message], response)
             if self.memory_manager:
                 self.memory_manager.log_message("user",   user_message)
@@ -271,15 +271,16 @@ class GeneratorAgent:
             self._turn_count += 1
             if self._turn_count % self._extract_interval == 0:
                 asyncio.create_task(self._extract_memory())
-            logger.info(f"☕ Master単独: {response[:50]}")
+            logger.info(f"🌙 chara2単独: {response[:50]}")
 
     async def _relay_to_master(self, msg: ChatMessage):
         user_message = msg.message
-        logger.info(f"↪ マスター呼びかけ検出: 「{user_message[:30]}」")
+        logger.info(f"↪ chara2呼びかけ検出: 「{user_message[:30]}」")
 
         relay_prompt = self._build_prompt("master_relay", {
             "user_message": user_message,
             "mia_persona":  self._get_mia_persona_str(),
+            "master_persona": self._get_master_persona_str(),
         })
         relay_text = ""
         if relay_prompt:
@@ -288,8 +289,10 @@ class GeneratorAgent:
                 {"role": "user",   "content": user_message},
             ])).strip()
         if relay_text:
-            await self.output_queue.put(TextChunk(text=relay_text, emotion=self._detect_emotion(relay_text), speaker="mia"))
-            logger.info(f"💬 Mia中継: {relay_text[:40]}")
+            await self.output_queue.put(TextChunk(
+                text=relay_text, emotion=self._detect_emotion(relay_text), speaker="mia"
+            ))
+            logger.info(f"💬 chara1中継: {relay_text[:40]}")
 
         master_prompt = self._build_prompt("master_direct_response", {
             "user_message":       user_message,
@@ -308,15 +311,23 @@ class GeneratorAgent:
         if master_response:
             for s in self._split_into_sentences(master_response):
                 if s.strip():
-                    await self.output_queue.put(TextChunk(text=s.strip(), emotion=self._detect_emotion(s), speaker="master"))
-            logger.info(f"☕ Master返答: {master_response[:40]}")
+                    await self.output_queue.put(TextChunk(
+                        text=s.strip(), emotion=self._detect_emotion(s), speaker="master"
+                    ))
+            logger.info(f"🏠 chara2返答: {master_response[:40]}")
 
+        # フォローアップ（30%）— persona.yaml の mia_followup_prompt を使用
         if master_response and random.random() < 0.3:
+            followup_prompt = self._mia_followup_prompt.format(
+                master_response=master_response
+            )
             followup = (await self.llm.generate([
-                {"role": "system", "content": f"マスターが「{master_response}」と言いました。Miaとして一言だけ短く添えてください。1文のみ。テキストのみ出力。"},
+                {"role": "system", "content": followup_prompt},
             ])).strip()
             if followup:
-                await self.output_queue.put(TextChunk(text=followup, emotion="happy", speaker="mia"))
+                await self.output_queue.put(TextChunk(
+                    text=followup, emotion="happy", speaker="mia"
+                ))
 
         self.context.add_exchange([user_message], master_response)
         if self.memory_manager:
@@ -358,13 +369,16 @@ class GeneratorAgent:
         if not history:
             return
         conversation_text = "\n".join(
-            f"{'お客さん' if m['role'] == 'user' else 'Mia/Master'}: {m['content']}" for m in history
+            f"{'ユーザー' if m['role'] == 'user' else 'キャラクター'}: {m['content']}"
+            for m in history
         )
         extract_prompt = self._build_prompt("memory_extract", {"conversation": conversation_text})
         if not extract_prompt:
             return
         try:
-            raw = (await self.llm.generate([{"role": "system", "content": extract_prompt}], max_tokens=512)).strip()
+            raw = (await self.llm.generate(
+                [{"role": "system", "content": extract_prompt}], max_tokens=512
+            )).strip()
             if "```" in raw:
                 parts = raw.split("```")
                 raw = parts[1] if len(parts) > 1 else raw
@@ -387,7 +401,7 @@ class GeneratorAgent:
         if re.search(r'(えっ|マジ|すごい|びっくり|驚|えぇ|ほんと[にう]？|信じられ|衝撃|！？|？！|まさか|うそ)', full_text): return "surprised"
         if re.search(r'(怒|むかつく|ひどい|ふざけ|許さ|イライラ|うざ)', full_text): return "angry"
         if re.search(r'(嬉し|楽し|やった|わーい|ありがと|好き|最高|大好き|幸せ|かわいい|おめでと|よかった)', full_text): return "happy"
-        if re.search(r'(ふふ|のんびり|まったり|ゆっくり|癒さ|落ち着|コーヒー|カフェ)', full_text): return "relaxed"
+        if re.search(r'(のんびり|まったり|ゆっくり|癒さ|落ち着)', full_text): return "relaxed"
         return "neutral"
 
     async def close(self):

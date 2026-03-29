@@ -25,7 +25,6 @@ const BASE_CHAR  = './assets/character/';
 let _sceneImages = {
   bg_indoor: 'bg_indoor.png',
   obj_mid:   'obj_mid.png',
-  obj_front: 'obj_front.png',
   scenery: {
     day:       'scenery_day.png',
     dawn:      'scenery_dawn.png',
@@ -58,6 +57,9 @@ let _charaCfg = {
   },
 };
 
+// 左上オーバーレイのタイトル（config.yaml の scene.overlay_title から読み込む）
+let _overlayTitle = '☕ Cafe Lumiere';
+
 // ============================================================
 // 画像管理
 // ============================================================
@@ -75,7 +77,7 @@ function _buildImageList() {
   list['scenery_rain']      = BASE_IMAGE + s.rain;
   list['bg_indoor'] = BASE_IMAGE + _sceneImages.bg_indoor;
   list['obj_mid']   = BASE_IMAGE + _sceneImages.obj_mid;
-  list['obj_front'] = BASE_IMAGE + _sceneImages.obj_front;
+  list['obj_front'] = BASE_IMAGE + (_sceneImages.obj_front || 'obj_front.png');
   for (const [charaId, cfg] of Object.entries(_charaCfg)) {
     const seen = new Set();
     for (const frame of [...(cfg.pool || []), ...(cfg.late_night_pool || [])]) {
@@ -107,15 +109,13 @@ let currentWeather = 'sunny';
 
 function getSceneryKey(weather) {
   const h = new Date().getHours();
-  // 夜・深夜は天気に関係なく固定
   if (h >= 23 || h < 4)  return 'scenery_latenight';
   if (h >= 19 && h < 23) return 'scenery_night';
-  // 夜明け・昼・夕方は天気で切り替え
   if (weather === 'rain')   return 'scenery_rain';
   if (weather === 'cloudy') return 'scenery_cloudy';
   if (h >= 4  && h < 6)  return 'scenery_dawn';
   if (h >= 6  && h < 16) return 'scenery_day';
-  return 'scenery_evening'; // 16:00〜18:59
+  return 'scenery_evening';
 }
 
 function isLateNight() { const h = new Date().getHours(); return (h >= 23 || h < 6); }
@@ -219,7 +219,7 @@ function drawFixed(ctx, key) {
 }
 
 // ============================================================
-// 時刻・日付・カフェ名オーバーレイ（フォント1.2倍・日付追加）
+// 左上オーバーレイ（タイトルは config.yaml の scene.overlay_title から読み込む）
 // ============================================================
 function drawOverlay(ctx, canvas) {
   const now = new Date();
@@ -230,12 +230,12 @@ function drawOverlay(ctx, canvas) {
   const dateStr = `${now.getMonth()+1}/${now.getDate()}(${weekDays[now.getDay()]})`;
 
   const pad      = canvas.width * 0.015;
-  const fontSize = Math.max(14, canvas.height * 0.0336); // 0.028 × 1.2
+  const fontSize = Math.max(14, canvas.height * 0.0336);
 
   ctx.globalAlpha = 1.0;
   ctx.font = `bold ${fontSize}px 'Hiragino Kaku Gothic ProN', sans-serif`;
 
-  const logoW = ctx.measureText('☕ Cafe Lumiere').width;
+  const logoW = ctx.measureText(_overlayTitle).width;
   const restW = ctx.measureText(`  ${dateStr}  ${timeStr}`).width;
   const textW = logoW + restW;
 
@@ -246,7 +246,7 @@ function drawOverlay(ctx, canvas) {
 
   const y = pad + fontSize * 1.2;
   ctx.fillStyle = '#d4a87a';
-  ctx.fillText('☕ Cafe Lumiere', pad * 2, y);
+  ctx.fillText(_overlayTitle, pad * 2, y);
   ctx.fillStyle = '#c8c0a0';
   ctx.fillText(`  ${dateStr}  ${timeStr}`, pad * 2 + logoW, y);
 }
@@ -303,8 +303,9 @@ function initScene() {
   fetch('/api/config')
     .then(r => r.json())
     .then(cfg => {
-      if (cfg.scene_images) _sceneImages = cfg.scene_images;
-      if (cfg.characters)   _charaCfg   = cfg.characters;
+      if (cfg.scene_images) _sceneImages  = cfg.scene_images;
+      if (cfg.characters)   _charaCfg     = cfg.characters;
+      if (cfg.scene?.overlay_title) _overlayTitle = cfg.scene.overlay_title;
     })
     .catch(() => {})
     .finally(() => {

@@ -27,7 +27,7 @@
     },
     reversi_result: {
       win:  [['負けた…。次は絶対勝つ','sad'],['くっ、やられた。強いね','sad'],['うー、悔しい！','sad']],
-      lose: [['わたしの勝ちだよ。強くなってね','relaxed'],['やった、勝てた！','happy'],['えへへ、りんの勝ち','happy']],
+      lose: [['わたしの勝ちだよ。強くなってね','relaxed'],['やった、勝てた！','happy'],['えへへ、勝ったよ','happy']],
       draw: [['引き分け！　すごい','surprised'],['まさかの同点だ','surprised']],
     },
     concentration_player_streak: {

@@ -42,7 +42,6 @@ def _build_ssl_context(config: dict):
     return ctx
 
 
-# デフォルトキャラクター設定（config.yaml に characters がない場合のフォールバック）
 _DEFAULT_CHARACTERS = {
     "chara1": {
         "pool": [
@@ -64,7 +63,6 @@ _DEFAULT_CHARACTERS = {
     },
 }
 
-# デフォルト背景画像設定
 _DEFAULT_SCENE_IMAGES = {
     "bg_indoor": "bg_indoor.png",
     "obj_mid":   "obj_mid.png",
@@ -88,11 +86,12 @@ async def start_http_server(config: dict, shutdown_event: asyncio.Event, ssl_con
     app = web.Application()
 
     async def handle_api_config(request):
-        bgm_cfg         = config.get("bgm", {})
-        stt_cfg         = config.get("stt", {})
-        tts_cfg         = config.get("tts", {})
-        characters_cfg  = config.get("characters", _DEFAULT_CHARACTERS)
-        scene_cfg       = config.get("scene_images", _DEFAULT_SCENE_IMAGES)
+        bgm_cfg        = config.get("bgm", {})
+        stt_cfg        = config.get("stt", {})
+        tts_cfg        = config.get("tts", {})
+        scene_cfg_raw  = config.get("scene", {})
+        characters_cfg = config.get("characters", _DEFAULT_CHARACTERS)
+        scene_img_cfg  = config.get("scene_images", _DEFAULT_SCENE_IMAGES)
 
         default_schedules = [
             {"file": "assets/bgm/cafe_bgm_morning.mp3", "start": 6},
@@ -110,10 +109,15 @@ async def start_http_server(config: dict, shutdown_event: asyncio.Event, ssl_con
             },
             "tts": {
                 "provider": tts_cfg.get("provider", "voicevox"),
+                "volume":   tts_cfg.get("volume", 1.0),
             },
             "characters":   characters_cfg,
-            "scene_images": scene_cfg,
+            "scene_images": scene_img_cfg,
+            "scene": {
+                "overlay_title": scene_cfg_raw.get("overlay_title", "☕ Cafe Lumiere"),
+            },
         })
+
     app.router.add_get("/api/config", handle_api_config)
 
     assets_path = Path("assets").resolve()

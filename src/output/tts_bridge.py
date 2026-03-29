@@ -4,11 +4,15 @@ TTS Bridge - VOICEVOX / Style-Bert-VITS2 両対応 (vA1)
 config.yaml の tts.provider で切り替え:
   provider: "voicevox" → VOICEVOX（推奨・要インストール・CPU動作）
   provider: "sbv2"     → Style-Bert-VITS2（本編互換）
+
+tts.volume（1.0以上）を設定すると、サーバー側でWAV音量を増幅して送信する。
+Python 3.13 で audioop が削除されたため numpy で実装。
 """
 import asyncio
 import io
 import logging
 import re
+import struct
 import wave
 from pathlib import Path
 
@@ -75,13 +79,56 @@ def _load_dict(dict_file: str) -> list[tuple[re.Pattern, str]]:
     return patterns
 
 
+def _amplify_wav(wav_data: bytes, volume: float) -> bytes:
+    """
+    WAVデータの音量を volume 倍に増幅して返す。
+    volume=1.0 は変化なし、2.0 で2倍に増幅。
+    numpy が使える場合は numpy で、なければ struct で処理する。
+    """
+    if abs(volume - 1.0) < 0.01:
+        return wav_data
+
+    try:
+        with wave.open(io.BytesIO(wav_data), "rb") as wf:
+            params = wf.getparams()
+            frames = wf.readframes(wf.getnframes())
+            sampwidth = wf.getsampwidth()
+
+        # 16bit PCM のみ対応（VOICEVOXは常に16bit）
+        if sampwidth != 2:
+            return wav_data
+
+        try:
+            import numpy as np
+            samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32)
+            samples *= volume
+            # クリッピング（-32768〜32767 に収める）
+            samples = np.clip(samples, -32768, 32767)
+            amplified = samples.astype(np.int16).tobytes()
+        except ImportError:
+            # numpy がない場合は struct で処理
+            n = len(frames) // 2
+            samples_list = list(struct.unpack(f'<{n}h', frames))
+            amplified_list = [max(-32768, min(32767, int(s * volume))) for s in samples_list]
+            amplified = struct.pack(f'<{n}h', *amplified_list)
+
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as out:
+            out.setparams(params)
+            out.writeframes(amplified)
+        return buf.getvalue()
+
+    except Exception as e:
+        logger.warning(f"⚠️ WAV増幅エラー（元データで送信）: {e}")
+        return wav_data
+
+
 class TTSBridge:
     """VOICEVOX / Style-Bert-VITS2 両対応 TTS ブリッジ"""
 
     def __init__(self, config: dict):
         tts_config = config.get("tts", {})
 
-        # プロバイダー切り替え
         self._provider = tts_config.get("provider", "voicevox").strip().lower()
 
         # VOICEVOX設定
@@ -91,18 +138,21 @@ class TTSBridge:
         self._vv_speed     = tts_config.get("speed_scale", 1.0)
         self._vv_pitch     = tts_config.get("pitch_scale", 0.0)
 
-        # SBV2設定（本編互換）
+        # SBV2設定
         self.endpoint           = tts_config.get("endpoint", "http://localhost:5000")
         self.default_model_name = tts_config.get("mia_model_name", "woman001")
         self.speed              = tts_config.get("speed", 1.0)
         self.style_weight       = tts_config.get("style_weight", 1.0)
+
+        # 音量増幅（1.0 = 変化なし、2.0 = 2倍）
+        self._volume = float(tts_config.get("volume", 1.0))
 
         # 読み辞書
         dict_file = tts_config.get("dict_file", "tts_dict.yaml")
         self._dict_patterns = _load_dict(dict_file)
 
         self._session: aiohttp.ClientSession | None = None
-        logger.info(f"🔊 TTSBridge: provider={self._provider}")
+        logger.info(f"🔊 TTSBridge: provider={self._provider}, volume={self._volume}")
 
     def _apply_dict(self, text: str) -> str:
         for pattern, reading in self._dict_patterns:
@@ -117,14 +167,6 @@ class TTSBridge:
         return self._session
 
     async def synthesize(self, text: str, model_name: str = None, speaker: str = "mia") -> dict | None:
-        """
-        テキストを音声合成して {"audio": bytes, "duration": float} を返す。
-
-        Args:
-            text:       合成テキスト
-            model_name: SBV2モデル名（VOICEVOXの場合は無視）
-            speaker:    "mia" | "master"（VOICEVOXのspeaker_id切り替えに使用）
-        """
         if not text.strip():
             return None
 
@@ -139,12 +181,10 @@ class TTSBridge:
             return await self._synthesize_sbv2(text, model_name)
 
     async def _synthesize_voicevox(self, text: str, speaker: str = "mia") -> dict | None:
-        """VOICEVOX APIで音声合成（2ステップ）"""
         speaker_id = self._vv_mia_id if speaker == "mia" else self._vv_master_id
         session = await self._get_session()
 
         try:
-            # Step1: audio_query 取得
             async with session.post(
                 f"{self._vv_endpoint}/audio_query",
                 params={"text": text, "speaker": speaker_id},
@@ -154,11 +194,9 @@ class TTSBridge:
                     return None
                 query = await resp.json()
 
-            # 話速・ピッチを設定
             query["speedScale"] = self._vv_speed
             query["pitchScale"] = self._vv_pitch
 
-            # Step2: synthesis（WAV生成）
             async with session.post(
                 f"{self._vv_endpoint}/synthesis",
                 params={"speaker": speaker_id},
@@ -170,8 +208,11 @@ class TTSBridge:
                     return None
                 audio_data = await resp.read()
 
+            # サーバー側で音量増幅
+            audio_data = _amplify_wav(audio_data, self._volume)
+
             duration = self._calc_duration(audio_data)
-            logger.info(f"🔊 VOICEVOX合成: [id={speaker_id}] {text[:20]}... ({duration:.1f}s)")
+            logger.info(f"🔊 VOICEVOX合成: [id={speaker_id}] {text[:20]}... ({duration:.1f}s, vol={self._volume})")
             return {"audio": audio_data, "duration": duration}
 
         except aiohttp.ClientError as e:
@@ -182,7 +223,6 @@ class TTSBridge:
             return None
 
     async def _synthesize_sbv2(self, text: str, model_name: str = None) -> dict | None:
-        """Style-Bert-VITS2 APIで音声合成"""
         model = model_name or self.default_model_name
         session = await self._get_session()
 
@@ -199,8 +239,12 @@ class TTSBridge:
                     logger.error(f"❌ SBV2 API エラー: {resp.status}")
                     return None
                 audio_data = await resp.read()
+
+                # サーバー側で音量増幅
+                audio_data = _amplify_wav(audio_data, self._volume)
+
                 duration = self._calc_duration(audio_data)
-                logger.info(f"🔊 SBV2合成: [{model}] {text[:20]}... ({duration:.1f}s)")
+                logger.info(f"🔊 SBV2合成: [{model}] {text[:20]}... ({duration:.1f}s, vol={self._volume})")
                 return {"audio": audio_data, "duration": duration}
 
         except aiohttp.ClientError as e:

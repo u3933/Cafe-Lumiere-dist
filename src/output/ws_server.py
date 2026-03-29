@@ -1,5 +1,5 @@
 """
-WebSocket Server（本編と同一）
+WebSocket Server（dist版）
 """
 import asyncio
 import base64
@@ -78,6 +78,8 @@ class WSServer:
             username = data.get("username", "user")
             message  = data.get("message", "").strip()
             if message:
+                # ユーザーテキストをチャット履歴に即時表示
+                await self.broadcast({"type": "user_text", "text": message})
                 msg = ChatMessage(user_id=f"text_{username}", username=username, message=message, timestamp=time.time())
                 if self.voice_queue.full():
                     try: self.voice_queue.get_nowait()

@@ -48,39 +48,29 @@ tts:
 # BGM設定
 #
 # dist版はブラウザ側（Web Audio API）で再生するため enabled: false が正しい。
-# enabled: true にするとサーバー側でも pygame による再生が試みられる（通常不要）。
-#
 # schedules: 時間帯別BGMを最大3件（ブラウザ再生用）
 #   ファイルが1種類なら start: 0 を1件だけ指定する。
 # ============================================================
 bgm:
-  enabled: false                     # サーバー側 pygame 再生は無効（ブラウザ側で再生）
+  enabled: false
   volume: 0.1
   schedules:
     - file: "assets/bgm/cafe_bgm_morning.mp3"
-      start: 6                       # 6時〜
+      start: 6
     - file: "assets/bgm/cafe_bgm.mp3"
-      start: 13                      # 13時〜
+      start: 13
     - file: "assets/bgm/cafe_bgm_night.mp3"
-      start: 22                      # 22時〜
+      start: 22
+
+# ============================================================
+# 画面左上オーバーレイのタイトル
+# 世界観に合わせて自由に変更してください
+# ============================================================
+scene:
+  overlay_title: "☕ Cafe Lumiere"   # 例: "🚀 Space Station" / "🔮 Magic Shop"
 
 # ============================================================
 # キャラクター画像設定
-#
-# chara1 / chara2 の2キャラ固定。
-# 各キャラ最大6枚まで pool に登録できる。
-#
-# layer: 描画レイヤー番号（後ろ→前の順）
-#   2 = 背景直前（マスターより後ろ）
-#   3 = マスターと同列（master用に使用）
-#   5 = 前景オブジェクトの手前
-#
-# condition（省略可）:
-#   sunny_daytime … 晴れの昼〜夕方のみ出現（省略時は常時）
-#   late_night    … 深夜専用（23時〜6時のみ）
-#
-# late_night_pool（省略可）:
-#   深夜帯に使用する専用プール。省略時は pool をそのまま使用。
 # ============================================================
 characters:
   chara1:
@@ -95,8 +85,7 @@ characters:
         layer: 5
       - file: "chara1_rest.png"
         layer: 3
-        condition: sunny_daytime   # 晴れの昼〜夕方のみ出現
-    # 深夜専用プール
+        condition: sunny_daytime
     late_night_pool:
       - file: "chara1_sleep.png"
         layer: 2
@@ -112,10 +101,9 @@ characters:
 # 背景・固定レイヤー画像設定
 # ============================================================
 scene_images:
-  bg_indoor: "bg_indoor.png"         # 室内背景（常時表示）
-  obj_mid:   "obj_mid.png"           # 中景オブジェクト（常時表示）
-  obj_front: "obj_front.png"         # 前景オブジェクト（常時表示）
-  # 風景（天気・時間帯で自動切り替え）
+  bg_indoor: "bg_indoor.png"
+  obj_mid:   "obj_mid.png"
+  obj_front: "obj_front.png"
   scenery:
     day:       "scenery_day.png"
     dawn:      "scenery_dawn.png"

@@ -61,7 +61,7 @@ class ScenarioBuffer:
             if not text:
                 await asyncio.sleep(5.0)
                 return
-            exchange = self._parse_dialogue(text)
+            exchange = self._parse_dialogue(text, self._persona)
             if len(exchange) < 2:
                 logger.warning(f"⚠️ 掛け合い解析失敗 ({len(exchange)}行): {text[:60]!r}")
                 await asyncio.sleep(5.0)
@@ -110,35 +110,57 @@ class ScenarioBuffer:
         master = self._persona.get("master", {})
         mia_persona    = f"{mia.get('description', '')} 口調: {mia.get('tone', '')}"
         master_persona = f"{master.get('description', '')} 口調: {master.get('tone', '')}"
+        mia_name    = mia.get("name", "Mia")
+        master_name = master.get("name", "Master")
         if not template:
+            # フォールバック: persona.yaml のキャラ名を使用
             return (
-                f"カフェのスタッフMiaとオーナーMasterの掛け合いを以下の形式で生成してください。\n"
+                f"{mia_name}と{master_name}の掛け合いを以下の形式で生成してください。\n"
                 f"話題: {theme.get('title', '')}\n"
-                f"Mia: [Miaの発言]\nMaster: [Masterの発言]\nテキストのみ出力。"
+                f"{mia_name}: [{mia_name}の発言]\n"
+                f"{master_name}: [{master_name}の発言]\n"
+                f"テキストのみ出力。"
             )
         return template.format(
             theme_title=theme.get("title", ""),
             theme_prompt=theme.get("prompt", ""),
             mia_persona=mia_persona,
             master_persona=master_persona,
+            mia_name=mia_name,
+            master_name=master_name,
             real_world_context=world_state.get_context_str(),
         )
 
-    @staticmethod
-    def _parse_dialogue(text: str) -> DialogueExchange:
+    @classmethod
+    def _parse_dialogue(cls, text: str, persona: dict = None) -> DialogueExchange:
+        """
+        LLMの出力テキストを解析してDialogueExchangeに変換する。
+        persona が渡された場合はキャラ名も認識する。
+        """
         result = []
+
+        # 認識するプレフィックスのリスト（固定 + persona由来のキャラ名）
+        prefixes = [
+            ("Mia:", "mia"), ("Mia：", "mia"),
+            ("Master:", "master"), ("Master：", "master"),
+            ("ミア:", "mia"), ("マスター:", "master"),
+        ]
+        if persona:
+            mia_name    = persona.get("mia", {}).get("name", "")
+            master_name = persona.get("master", {}).get("name", "")
+            if mia_name and mia_name not in ("Mia", "ミア"):
+                prefixes = [(f"{mia_name}:", "mia"), (f"{mia_name}：", "mia")] + prefixes
+            if master_name and master_name not in ("Master", "マスター"):
+                prefixes = [(f"{master_name}:", "master"), (f"{master_name}：", "master")] + prefixes
+
         for line in text.strip().splitlines():
             line = line.strip()
             if not line:
                 continue
-            for prefix, speaker in [
-                ("Mia:", "mia"), ("Mia：", "mia"),
-                ("Master:", "master"), ("Master：", "master"),
-                ("ミア:", "mia"), ("マスター:", "master"),
-            ]:
+            for prefix, speaker in prefixes:
                 if line.lower().startswith(prefix.lower()):
                     content = line[len(prefix):].strip()
-                    if content and ScenarioBuffer.is_valid_response(content):
+                    if content and cls.is_valid_response(content):
                         result.append({"speaker": speaker, "text": content})
                     break
         return result

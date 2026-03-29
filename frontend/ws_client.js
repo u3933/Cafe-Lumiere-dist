@@ -1,9 +1,12 @@
 /**
  * ws_client.js (vA1) - WebSocket受信 / 吹き出し制御 / 音声再生
  *
- * キャラクター名（speaker）を chara1/chara2 として汎用化。
- * 吹き出しID: bubble-chara1 / bubble-chara2
- * bubble-mia / bubble-master も後方互換で動作する。
+ * BGM・TTS ともに同一の AudioContext で再生することで
+ * iOS のオーディオセッション競合によるダッキング（TTS音量低下）を解消する。
+ *
+ * 音量設定（config.yaml）:
+ *   bgm.volume  : BGM音量（0.0〜1.0）デフォルト 0.3
+ *   tts.volume  : TTS音量（0.0〜2.0）デフォルト 1.0（1.0超で増幅可）
  */
 
 const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.hostname}:8765`;
@@ -12,9 +15,7 @@ let ws = null;
 let wsReady = false;
 let reconnectTimer = null;
 
-// speaker名 → 吹き出しID のマッピング（/api/config から characters を取得したら動的に上書き）
 let _speakerIds = ['chara1', 'chara2'];
-
 const bubbleTimers = {};
 
 window.AppState = {
@@ -22,6 +23,189 @@ window.AppState = {
   micState: 'idle',
 };
 
+// ============================================================
+// AudioContext（BGM・TTS 共通）— 最初に定義
+// ============================================================
+let audioCtx      = null;
+let currentSource = null;
+
+// ---- BGM ----
+const BGM_BASE_GAIN  = 2.0;
+const BGM_DUCK_RATIO = 0.4;
+let _bgmVolume       = 0.3;
+let _bgmGain         = null;
+let _bgmMediaSource  = null;
+let bgmRequested     = false;
+let bgmStarted       = false;
+
+// ---- TTS ----
+let _ttsVolume = 1.0;
+
+function _bgmEffectiveGain(v) { return Math.min(1.0, v * BGM_BASE_GAIN); }
+
+function _setBgmDucking(duck) {
+  if (!_bgmGain) return;
+  const ctx = getAudioCtx();
+  const now = ctx.currentTime;
+  const target = duck
+    ? _bgmEffectiveGain(_bgmVolume) * BGM_DUCK_RATIO
+    : _bgmEffectiveGain(_bgmVolume);
+  _bgmGain.gain.cancelScheduledValues(now);
+  _bgmGain.gain.setValueAtTime(_bgmGain.gain.value, now);
+  _bgmGain.gain.linearRampToValueAtTime(target, now + 0.3);
+}
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+window.getAudioCtx = getAudioCtx;
+
+function unlockAudioCtx() {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (bgmRequested) startBGM();
+}
+document.addEventListener('click',      unlockAudioCtx, { once: false });
+document.addEventListener('touchstart', unlockAudioCtx, { once: false });
+
+window.resumeAudioAfterMic = function () {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (bgmRequested && _bgmAudioEl && _bgmAudioEl.paused) _bgmAudioEl.play().catch(() => {});
+};
+
+// ============================================================
+// BGM
+// ============================================================
+const _bgmAudioEl = document.getElementById('bgm-audio');
+
+let _bgmSchedules = [
+  { file: '/assets/bgm/cafe_bgm_morning.mp3', start: 6  },
+  { file: '/assets/bgm/cafe_bgm.mp3',         start: 13 },
+  { file: '/assets/bgm/cafe_bgm_night.mp3',   start: 22 },
+];
+
+function _getBgmFile() {
+  const h = new Date().getHours();
+  const sorted = [..._bgmSchedules].sort((a, b) => a.start - b.start);
+  let match = sorted.filter(s => s.start <= h).pop();
+  if (!match) match = sorted[sorted.length - 1];
+  return match ? match.file : '/assets/bgm/cafe_bgm.mp3';
+}
+
+function _updateBgmSource() {
+  if (!_bgmAudioEl) return;
+  const desired = _getBgmFile();
+  const currentSrc = _bgmAudioEl.src ? new URL(_bgmAudioEl.src).pathname : '';
+  if (currentSrc === desired) return;
+  const wasPlaying = !_bgmAudioEl.paused;
+  _bgmAudioEl.pause();
+  _bgmAudioEl.src = desired;
+  _bgmAudioEl.currentTime = 0;
+  if (wasPlaying) _bgmAudioEl.play().catch(() => {});
+}
+
+function _connectBgmToCtx() {
+  if (!_bgmAudioEl || _bgmMediaSource) return;
+  try {
+    const ctx = getAudioCtx();
+    _bgmMediaSource = ctx.createMediaElementSource(_bgmAudioEl);
+    _bgmGain = ctx.createGain();
+    _bgmGain.gain.value = _bgmEffectiveGain(_bgmVolume);
+    _bgmMediaSource.connect(_bgmGain);
+    _bgmGain.connect(ctx.destination);
+    console.log(`🎵 BGM → AudioContext 接続完了 (gain=${_bgmGain.gain.value.toFixed(2)})`);
+  } catch (e) { console.warn('BGM AudioContext 接続エラー:', e); }
+}
+
+function startBGM() {
+  if (!bgmRequested || !_bgmAudioEl) return;
+  _updateBgmSource();
+  _connectBgmToCtx();
+  _bgmAudioEl.play().then(() => { bgmStarted = true; }).catch(() => {});
+}
+
+function stopBGM() {
+  bgmRequested = false; bgmStarted = false;
+  if (_bgmAudioEl) { _bgmAudioEl.pause(); _bgmAudioEl.currentTime = 0; }
+}
+
+if (_bgmAudioEl) {
+  _bgmAudioEl.loop = true;
+  _bgmAudioEl.volume = 1.0;
+}
+setInterval(_updateBgmSource, 60 * 1000);
+
+// ============================================================
+// /api/config 読み込み（BGM・TTS両方の音量を確実に取得）
+// ============================================================
+fetch('/api/config').then(r => r.json()).then(cfg => {
+  // BGM音量
+  if (cfg.bgm?.volume !== undefined) {
+    _bgmVolume = cfg.bgm.volume;
+    if (_bgmGain) _bgmGain.gain.value = _bgmEffectiveGain(_bgmVolume);
+  }
+  // TTS音量
+  if (cfg.tts?.volume !== undefined) {
+    _ttsVolume = cfg.tts.volume;
+    console.log(`🔊 TTS音量: ${_ttsVolume}`);
+  }
+  // BGMスケジュール
+  if (Array.isArray(cfg.bgm?.schedules) && cfg.bgm.schedules.length > 0)
+    _bgmSchedules = cfg.bgm.schedules.map(s => ({ file: '/' + s.file, start: s.start }));
+  // キャラクターID
+  if (cfg.characters) _speakerIds = Object.keys(cfg.characters);
+
+  _updateBgmSource();
+}).catch(() => { _updateBgmSource(); });
+
+// ============================================================
+// TTS 音声再生（GainNode で音量制御）
+// ============================================================
+async function playAudio(audioB64, durationMs) {
+  try {
+    if (currentSource) { try { currentSource.stop(); } catch(e) {} currentSource = null; }
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+
+    const binary = atob(audioB64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const audioBuffer = await ctx.decodeAudioData(bytes.buffer);
+
+    return new Promise((resolve) => {
+      const source  = ctx.createBufferSource();
+      const ttsGain = ctx.createGain();
+      ttsGain.gain.value = _ttsVolume;
+      console.log(`🔊 TTS再生 gain=${_ttsVolume}`);
+
+      source.buffer = audioBuffer;
+      source.connect(ttsGain);
+      ttsGain.connect(ctx.destination);
+      source.start();
+      currentSource = source;
+      startLipSync(source);
+      source.addEventListener('ended', resolve);
+    });
+  } catch (e) { console.error('音声再生エラー:', e); await sleep(durationMs); }
+}
+
+function startLipSync(source) {
+  const charaId = _speakerIds[0] || 'chara1';
+  let open = true;
+  const timer = setInterval(() => {
+    if (window.SceneAPI) { SceneAPI.setMouthOpen(charaId, open); open = !open; }
+  }, 80);
+  source.addEventListener('ended', () => {
+    clearInterval(timer);
+    if (window.SceneAPI) SceneAPI.setMouthOpen(charaId, false);
+  });
+}
+
+// ============================================================
+// WebSocket
+// ============================================================
 function connectWS() {
   ws = new WebSocket(WS_URL);
   ws.addEventListener('open', () => { console.log('✅ WS接続完了'); wsReady = true; clearTimeout(reconnectTimer); });
@@ -63,12 +247,10 @@ async function handleSpeak(data) {
   showBubble(speaker, summary, duration);
   addSpeakToChat(speaker, data.text || summary);
 
+  _setBgmDucking(true);
   if (data.audio) { await playAudio(data.audio, duration); } else { await sleep(duration); }
-
   if (window.SceneAPI) { SceneAPI.setSpeaking(speaker, false); SceneAPI.setMouthOpen(speaker, false); }
-
-  // TTS再生完了後にBGMを再開（iOS は AudioContext 再生中に <audio> を停止するため）
-  if (bgmRequested && bgmAudio) bgmAudio.play().catch(() => {});
+  _setBgmDucking(false);
 
   AppState.speaking = false;
   updateMicState('idle');
@@ -104,119 +286,10 @@ function showBubble(speaker, text, durationMs) {
 }
 
 // ============================================================
-// BGM
-// ============================================================
-let audioCtx = null;
-let currentSource = null;
-const bgmAudio = document.getElementById('bgm-audio');
-let _bgmSchedules = [
-  { file: '/assets/bgm/cafe_bgm_morning.mp3', start: 6  },
-  { file: '/assets/bgm/cafe_bgm.mp3',         start: 13 },
-  { file: '/assets/bgm/cafe_bgm_night.mp3',   start: 22 },
-];
-
-function _getBgmFile() {
-  const h = new Date().getHours();
-  const sorted = [..._bgmSchedules].sort((a, b) => a.start - b.start);
-  let match = sorted.filter(s => s.start <= h).pop();
-  if (!match) match = sorted[sorted.length - 1];
-  return match ? match.file : '/assets/bgm/cafe_bgm.mp3';
-}
-
-function _updateBgmSource() {
-  if (!bgmAudio) return;
-  const desired = _getBgmFile();
-  if (bgmAudio.src.endsWith(desired)) return;
-  const wasPlaying = !bgmAudio.paused;
-  bgmAudio.pause(); bgmAudio.src = desired; bgmAudio.currentTime = 0;
-  if (wasPlaying) bgmAudio.play().catch(() => {});
-}
-
-if (bgmAudio) {
-  fetch('/api/config').then(r => r.json()).then(cfg => {
-    if (cfg.bgm?.volume !== undefined) bgmAudio.volume = cfg.bgm.volume;
-    else bgmAudio.volume = parseFloat(bgmAudio.dataset.volume ?? 0.3);
-    if (Array.isArray(cfg.bgm?.schedules) && cfg.bgm.schedules.length > 0)
-      _bgmSchedules = cfg.bgm.schedules.map(s => ({ file: '/' + s.file, start: s.start }));
-    // キャラクターID一覧を取得
-    if (cfg.characters) _speakerIds = Object.keys(cfg.characters);
-    _updateBgmSource();
-  }).catch(() => { bgmAudio.volume = parseFloat(bgmAudio.dataset.volume ?? 0.3); _updateBgmSource(); });
-  setInterval(_updateBgmSource, 60 * 1000);
-}
-
-let bgmStarted = false, bgmRequested = false;
-
-function startBGM() {
-  if (!bgmStarted && bgmRequested && bgmAudio) {
-    _updateBgmSource();
-    bgmAudio.play().then(() => { bgmStarted = true; }).catch(() => {});
-  }
-}
-
-function stopBGM() {
-  bgmRequested = false;
-  if (bgmAudio) { bgmAudio.pause(); bgmAudio.currentTime = 0; bgmStarted = false; }
-}
-
-function unlockAudioCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  startBGM();
-}
-document.addEventListener('click',      unlockAudioCtx, { once: false });
-document.addEventListener('touchstart', unlockAudioCtx, { once: false });
-
-function getAudioCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return audioCtx;
-}
-// voice.js の _playSilentBuffer から参照できるように公開
-window.getAudioCtx = getAudioCtx;
-
-// iOS は中断後も state が 'running' のままのことがあるため、状態チェックせず常に resume/play を呼ぶ
-window.resumeAudioAfterMic = function () {
-  if (audioCtx) audioCtx.resume().catch(() => {});
-  if (bgmRequested && bgmAudio) bgmAudio.play().catch(() => {});
-};
-
-async function playAudio(audioB64, durationMs) {
-  try {
-    if (currentSource) { try { currentSource.stop(); } catch(e) {} currentSource = null; }
-    const ctx_a = getAudioCtx();
-    if (ctx_a.state === 'suspended') await ctx_a.resume();
-    const binary = atob(audioB64);
-    const bytes  = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const audioBuffer = await ctx_a.decodeAudioData(bytes.buffer);
-    return new Promise((resolve) => {
-      const source = ctx_a.createBufferSource();
-      source.buffer = audioBuffer; source.connect(ctx_a.destination); source.start();
-      currentSource = source;
-      startLipSync(source);
-      source.addEventListener('ended', resolve);
-    });
-  } catch (e) { console.error('音声再生エラー:', e); await sleep(durationMs); }
-}
-
-function startLipSync(source) {
-  const charaId = _speakerIds[0] || 'chara1';
-  let open = true;
-  const timer = setInterval(() => {
-    if (window.SceneAPI) { SceneAPI.setMouthOpen(charaId, open); open = !open; }
-  }, 80);
-  source.addEventListener('ended', () => {
-    clearInterval(timer);
-    if (window.SceneAPI) SceneAPI.setMouthOpen(charaId, false);
-  });
-}
-
-// ============================================================
 // マイクボタン状態
 // ============================================================
 window.updateMicState = function(newState) {
   AppState.micState = newState;
-  // processing タイムアウトタイマーをキャンセル（正常応答 or 強制復帰）
   if (newState === 'idle' && window._processingTimer) {
     clearTimeout(window._processingTimer);
     window._processingTimer = null;
@@ -275,7 +348,6 @@ function addChatMessage(role, text) {
 function sendChatText() {
   const text = chatInput.value.trim();
   if (!text || !wsReady || !ws) return;
-  addChatMessage('user', text);
   chatInput.value = '';
   ws.send(JSON.stringify({ type: 'text_input', message: text, username: 'user' }));
 }
