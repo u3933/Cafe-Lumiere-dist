@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cafe Lumiere セットアップウィザード</title>
+<style>
+:root {
+  --bg:#f5f0eb; --surface:#fff; --border:#d4c8b8; --accent:#c8903a;
+  --accent2:#7a5c2e; --text:#2a1a0a; --muted:#8a7060; --danger:#c0392b;
+  --success:#27ae60; --info:#2980b9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;font-size:14px;min-height:100vh}
+header{background:var(--accent2);color:#fff;padding:12px 24px;display:flex;align-items:center;gap:10px}
+header h1{font-size:1.05rem;font-weight:bold}
+header p{font-size:0.75rem;opacity:.7}
+.tabs{display:flex;background:#3a2510}
+.tab-btn{flex:1;height:46px;border:none;background:none;color:rgba(255,255,255,.6);font-size:.82rem;cursor:pointer;transition:.15s;border-bottom:3px solid transparent}
+.tab-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+.tab-btn.active{color:#fff;border-bottom-color:var(--accent);background:rgba(255,255,255,.06)}
+.tab-pane{display:none}
+.tab-pane.active{display:grid;grid-template-columns:1fr 1fr;min-height:calc(100vh - 108px)}
+@media(max-width:860px){.tab-pane.active{grid-template-columns:1fr}}
+.fp{padding:20px 24px;overflow-y:auto;border-right:1px solid var(--border);max-height:calc(100vh - 108px)}
+.fp h2{font-size:.95rem;color:var(--accent2);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.sec{margin-bottom:22px}
+.sec-title{font-size:.72rem;font-weight:bold;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:.8rem;font-weight:bold;margin-bottom:3px}
+.hint{font-size:.72rem;color:var(--muted);margin-bottom:3px}
+.field input,.field select,.field textarea{width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text);font-size:.85rem;font-family:inherit;outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field textarea{resize:vertical;min-height:72px;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.notice{background:#fef9e7;border:1px solid #f0c040;border-radius:5px;padding:9px 12px;font-size:.76rem;color:#7a5c00;margin-bottom:14px}
+.badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:.68rem;font-weight:bold;margin-left:4px}
+.badge-req{background:#fde8e8;color:var(--danger)}
+.badge-opt{background:#e8f0fe;color:var(--info)}
+hr.div{border:none;border-top:1px solid var(--border);margin:14px 0}
+.btn{padding:6px 14px;border-radius:5px;font-size:.8rem;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);transition:.15s}
+.btn:hover{background:#ede5d8}
+.btn-sm{padding:4px 10px;font-size:.75rem}
+.btn-danger{border-color:var(--danger);color:var(--danger)}
+.btn-danger:hover{background:#fde8e8}
+.btn-success{border-color:var(--success);color:var(--success)}
+.btn-info{border-color:var(--info);color:var(--info)}
+.add-row{width:100%;padding:7px;border:1px dashed var(--border);border-radius:5px;background:var(--bg);color:var(--muted);cursor:pointer;font-size:.78rem;margin-top:4px}
+.add-row:hover{background:#ede5d8;color:var(--accent2)}
+.list-ed{border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.li-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surface);border-bottom:1px solid var(--border)}
+.li-row:last-child{border-bottom:none}
+.li-row input{flex:1;border:none;outline:none;font-size:.85rem;background:transparent}
+.bgm-row{display:grid;grid-template-columns:1fr 70px auto;gap:6px;align-items:center;margin-bottom:5px}
+.bgm-row input{padding:5px 7px;border:1px solid var(--border);border-radius:5px;font-size:.82rem}
+.si-row{display:grid;grid-template-columns:auto 1fr 32px;gap:6px;align-items:center;margin-bottom:5px}
+.si-row label{font-size:.75rem;color:var(--muted);white-space:nowrap}
+.si-row input{padding:5px 7px;border:1px solid var(--border);border-radius:5px;font-size:.82rem}
+.img-row{display:grid;grid-template-columns:1fr 56px 90px 32px 32px;gap:5px;align-items:center;margin-bottom:5px}
+.img-row input[type=text]{padding:5px 7px;border:1px solid var(--border);border-radius:5px;font-size:.82rem}
+.img-row select{padding:4px 4px;border:1px solid var(--border);border-radius:5px;font-size:.75rem}
+.img-row-lbl{font-size:.72rem;color:var(--muted);margin-bottom:2px;display:grid;grid-template-columns:1fr 56px 90px 32px 32px;gap:5px}
+.status{display:inline-block;padding:3px 8px;border-radius:4px;font-size:.73rem;font-weight:bold;margin-left:6px}
+.status-ok{background:#d4edda;color:#155724}
+.status-ng{background:#f8d7da;color:#721c24}
+.status-pending{background:#fff3cd;color:#856404}
+.pair-card{border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px;background:var(--surface);position:relative}
+.pair-del{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem}
+.pair-del:hover{color:var(--danger)}
+.d-line{display:grid;grid-template-columns:70px 1fr;gap:6px;margin-bottom:5px;align-items:center}
+.d-line:last-child{margin-bottom:0}
+.sp-tag{padding:2px 6px;border-radius:4px;text-align:center;font-size:.72rem;font-weight:bold}
+.sp-mia{background:#fef3e2;color:#8a5a00}
+.sp-mas{background:#e8f0fe;color:#1a4a8a}
+.d-line input{padding:4px 7px;border:1px solid var(--border);border-radius:4px;font-size:.82rem}
+.theme-card{border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:9px;background:var(--surface);position:relative}
+.theme-card .card-del{position:absolute;top:9px;right:9px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem}
+.theme-card .card-del:hover{color:var(--danger)}
+.preview-canvas-wrap{position:relative;width:100%;padding-top:56.25%;background:#1a0f0a;border-radius:6px;overflow:hidden;margin-bottom:10px}
+.preview-canvas-wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+.pp{background:#1e1408;display:flex;flex-direction:column;max-height:calc(100vh - 108px)}
+.pp-head{padding:10px 14px;border-bottom:1px solid #3a2a10;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.pp-head span{color:#d4a87a;font-size:.8rem;font-weight:bold}
+.pp-actions{display:flex;gap:6px}
+.copy-btn,.dl-btn{padding:4px 12px;border-radius:4px;font-size:.75rem;cursor:pointer;border:1px solid rgba(200,144,58,.5);color:#d4a87a;background:rgba(200,144,58,.15);transition:.15s}
+.copy-btn:hover,.dl-btn:hover{background:rgba(200,144,58,.3)}
+.copy-btn.copied{background:rgba(39,174,96,.3);border-color:var(--success);color:#a8e6c0}
+pre.yp{flex:1;padding:14px;margin:0;overflow:auto;font-size:.75rem;font-family:'Fira Code','Consolas',monospace;color:#d4c8a8;line-height:1.6;white-space:pre;background:transparent}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>☕ Cafe Lumiere セットアップウィザード</h1>
+    <p>アプリ経由で開いています — TTS音声テスト・BGM再生・画像プレビューが利用可能です</p>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('config',this)">⚙️ 環境設定（config.yaml）</button>
+  <button class="tab-btn" onclick="switchTab('persona',this)">🎭 AIペルソナ設定（persona.yaml）</button>
+  <button class="tab-btn" onclick="switchTab('themes',this)">🌏 世界観設定（themes.yaml）</button>
+</div>
+
+<!-- ============================= CONFIG ============================= -->
+<div id="tab-config" class="tab-pane active">
+  <div class="fp">
+    <h2>⚙️ 環境設定</h2>
+    <div class="notice">📌 右パネルのYAMLをコピー or ダウンロードして <code>config.yaml</code> として保存してください。</div>
+
+    <!-- LLM -->
+    <div class="sec">
+      <div class="sec-title">🤖 LLM設定</div>
+      <div class="field">
+        <label>プロバイダー <span class="badge badge-req">必須</span></label>
+        <select id="llm_prov" onchange="onLlmProvChange()">
+          <option value="gemini">Gemini API（推奨・簡単）</option>
+          <option value="openai_api">OpenAI API</option>
+          <option value="local">ローカルLLM（llama.cpp / LM Studio / Ollama）</option>
+        </select>
+      </div>
+      <div id="f_gemini">
+        <div class="field"><label>Gemini APIキー <span class="badge badge-req">必須</span></label><div class="hint">https://aistudio.google.com/ で無料取得</div><input id="gemini_key" placeholder="YOUR_GEMINI_API_KEY" oninput="rCfg()"></div>
+        <div class="field"><label>モデル</label><select id="gemini_model" onchange="rCfg()"><option value="gemini-2.0-flash">gemini-2.0-flash（推奨）</option><option value="gemini-1.5-flash">gemini-1.5-flash</option><option value="gemini-1.5-pro">gemini-1.5-pro</option></select></div>
+      </div>
+      <div id="f_openai" style="display:none">
+        <div class="field"><label>APIキー</label><input id="oai_key" placeholder="sk-..." oninput="rCfg()"></div>
+        <div class="field"><label>モデル</label><input id="oai_model" value="gpt-4o-mini" oninput="rCfg()"></div>
+      </div>
+      <div id="f_local" style="display:none">
+        <div class="field"><label>プリセット</label><select id="local_preset" onchange="applyLocalPreset()"><option value="llamacpp">llama.cpp (8080)</option><option value="lmstudio">LM Studio (1234)</option><option value="ollama">Ollama (11434)</option><option value="custom">カスタム</option></select></div>
+        <div class="field"><label>エンドポイントURL</label><input id="local_ep" value="http://localhost:8080/v1/chat/completions" oninput="rCfg()"></div>
+        <div class="field"><label>モデル名</label><input id="local_model" value="default" oninput="rCfg()"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Temperature</label><div class="hint">0.0（保守的）〜 1.0（創造的）</div><input type="number" id="temperature" value="0.8" min="0" max="1" step="0.05" oninput="rCfg()"></div>
+        <div class="field"><label>Max Tokens</label><input type="number" id="max_tokens" value="512" min="128" step="64" oninput="rCfg()"></div>
+      </div>
+      <!-- Google検索（今日の話題）：LLMプロバイダーに関係なく常に表示 -->
+      <hr class="div">
+      <div style="font-size:.78rem;font-weight:bold;color:var(--text);margin-bottom:6px">🔍 Google検索（今日の話題）</div>
+      <div class="hint" style="margin-bottom:8px">LLMの設定に関係なく、話題のリアルタイム検索には常にGemini APIを使用します。未設定でも動作しますが、今日の話題は生成されません。</div>
+      <div class="field">
+        <label>Gemini APIキー <span class="badge badge-opt">任意</span></label>
+        <div class="hint">https://aistudio.google.com/ で無料取得 — LLMにGeminiを選択済みの場合は上のキーが使われます</div>
+        <input id="google_search_key" placeholder="設定しない場合は空欄のままでOK" oninput="rCfg()">
+      </div>
+    </div>
+
+    <!-- TTS -->
+    <div class="sec">
+      <div class="sec-title">🔊 TTS設定（音声合成）</div>
+      <div class="field"><label>プロバイダー</label>
+        <select id="tts_prov" onchange="onTtsProvChange()">
+          <option value="voicevox">VOICEVOX（推奨・無料）</option>
+          <option value="sbv2">Style-Bert-VITS2</option>
+        </select>
+      </div>
+      <div id="f_voicevox">
+        <div class="field"><label>VOICEVOXサーバーアドレス</label><input id="vv_endpoint" value="http://localhost:50021" oninput="rCfg()"></div>
+        <div class="row2">
+          <div class="field"><label>chara1 話者ID</label><div class="hint">/speakers で確認</div><input type="number" id="mia_id" value="3" min="0" oninput="rCfg()"></div>
+          <div class="field"><label>chara2 話者ID</label><input type="number" id="mas_id" value="2" min="0" oninput="rCfg()"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>話速</label><input type="number" id="speed_scale" value="1.0" min="0.5" max="2.0" step="0.1" oninput="rCfg()"></div>
+          <div class="field"><label>ピッチ</label><input type="number" id="pitch_scale" value="0.0" min="-0.15" max="0.15" step="0.01" oninput="rCfg()"></div>
+        </div>
+      </div>
+      <div id="f_sbv2" style="display:none">
+        <div class="field"><label>SBV2サーバーアドレス</label><input id="sbv2_endpoint" value="http://localhost:5000" oninput="rCfg()"></div>
+        <div class="row2">
+          <div class="field"><label>chara1 モデル名</label><input id="sbv2_mia" value="woman001" oninput="rCfg()"></div>
+          <div class="field"><label>chara2 モデル名</label><input id="sbv2_mas" value="man001" oninput="rCfg()"></div>
+        </div>
+        <div class="field"><label>話速</label><div class="hint">1.0=標準（値が大きいほど遅い）</div><input type="number" id="sbv2_speed" value="1.0" min="0.5" max="2.0" step="0.1" oninput="rCfg()"></div>
+      </div>
+      <div class="field">
+        <label>TTS音量倍率</label><div class="hint">1.0=標準 / 3.0=推奨上限 / 5.0以上で音割れ</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="range" id="tts_vol" min="0.5" max="5" step="0.1" value="1.0" oninput="document.getElementById('tts_vol_v').textContent=this.value;rCfg()" style="flex:1">
+          <span id="tts_vol_v" style="min-width:28px">1.0</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>🔊 音声テスト <span class="badge badge-opt">アプリ経由のみ</span></label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input id="tts_test_text" value="テスト音声です。はじめまして。" style="flex:1;min-width:160px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:.82rem">
+          <button class="btn btn-sm btn-info" onclick="testTts('mia')">chara1再生</button>
+          <button class="btn btn-sm btn-info" onclick="testTts('master')">chara2再生</button>
+          <span id="tts_status"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BGM -->
+    <div class="sec">
+      <div class="sec-title">🎵 BGM設定</div>
+      <div class="field">
+        <label>BGM音量</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="range" id="bgm_vol" min="0" max="1" step="0.05" value="0.3" oninput="document.getElementById('bgm_vol_v').textContent=this.value;rCfg();updateBgmVolume()" style="flex:1">
+          <span id="bgm_vol_v">0.3</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>BGMスケジュール</label><div class="hint">時間帯ごとに異なるBGMを設定（最大3件）</div>
+        <div id="bgm_schedules"></div>
+        <button class="add-row" onclick="addBgmRow()">＋ 時間帯を追加</button>
+      </div>
+      <div class="field">
+        <label>🎵 BGM再生テスト <span class="badge badge-opt">アプリ経由のみ</span></label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-sm btn-success" onclick="toggleBgmTest()">▶ 再生 / ■ 停止</button>
+          <span id="bgm_status" style="font-size:.75rem;color:var(--muted)">スケジュールの1件目を再生します</span>
+        </div>
+        <audio id="bgm_test_audio" loop></audio>
+      </div>
+    </div>
+
+    <!-- 画面 -->
+    <div class="sec">
+      <div class="sec-title">🖥️ 画面設定</div>
+      <div class="field"><label>左上タイトル</label><div class="hint">例: ☕ Cafe Lumiere　🚀 Space Station　🔮 Magic Shop</div><input id="overlay_title" value="☕ Cafe Lumiere" oninput="rCfg()"></div>
+    </div>
+
+    <!-- 天気 -->
+    <div class="sec">
+      <div class="sec-title">🌤️ 天気連動 <span class="badge badge-opt">任意</span></div>
+      <div class="field"><label><input type="checkbox" id="weather_en" checked onchange="rCfg()"> 天気連動を有効にする</label></div>
+      <div class="field">
+        <label>地域名で検索 <span class="badge badge-opt">アプリ経由のみ</span></label>
+        <div style="display:flex;gap:6px">
+          <input id="location_name" placeholder="例: 東京　大阪　New York" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:.82rem">
+          <button class="btn btn-sm btn-info" onclick="searchLocation()">検索</button>
+        </div>
+        <span id="loc_status" style="font-size:.73rem;color:var(--muted)"></span>
+      </div>
+      <div class="row2">
+        <div class="field"><label>緯度</label><input type="number" id="lat" value="35.6762" step="0.0001" oninput="rCfg()"></div>
+        <div class="field"><label>経度</label><input type="number" id="lng" value="139.6503" step="0.0001" oninput="rCfg()"></div>
+      </div>
+    </div>
+
+    <!-- 背景・風景画像 -->
+    <div class="sec">
+      <div class="sec-title">🖼️ 背景・風景画像（scene_images）</div>
+      <div class="hint" style="margin-bottom:8px">👁 でプレビューに表示。ファイル名を変更すると config.yaml に即反映されます。</div>
+      <div class="si-row">
+        <label style="width:90px">室内背景</label>
+        <input id="si_bg" value="bg_indoor.png" oninput="rCfg()">
+        <button class="btn btn-sm" onclick="previewSceneImg('si_bg','image',1)" title="L1 プレビュー">👁</button>
+      </div>
+      <div class="si-row">
+        <label style="width:90px">中景オブジェクト</label>
+        <input id="si_objmid" value="obj_mid.png" oninput="rCfg()">
+        <button class="btn btn-sm" onclick="previewSceneImg('si_objmid','image',4)" title="L4 プレビュー">👁</button>
+      </div>
+      <div class="si-row">
+        <label style="width:90px">前景オブジェクト</label>
+        <input id="si_objfront" value="obj_front.png" oninput="rCfg()">
+        <button class="btn btn-sm" onclick="previewSceneImg('si_objfront','image',6)" title="L6 プレビュー">👁</button>
+      </div>
+      <div style="font-size:.78rem;font-weight:bold;color:var(--text);margin:10px 0 4px">風景（時間帯・天気で自動切替）<span style="font-weight:normal;color:var(--muted)"> — すべて L0 に表示</span></div>
+      <div class="si-row"><label style="width:90px">昼（晴れ）</label><input id="si_day" value="scenery_day.png" oninput="rCfg()"><button class="btn btn-sm" onclick="previewSceneImg('si_day','image',0)">👁</button></div>
+      <div class="si-row"><label style="width:90px">夜明け</label><input id="si_dawn" value="scenery_dawn.png" oninput="rCfg()"><button class="btn btn-sm" onclick="previewSceneImg('si_dawn','image',0)">👁</button></div>
+      <div class="si-row"><label style="width:90px">夕方</label><input id="si_evening" value="scenery_evening.png" oninput="rCfg()"><button class="btn btn-sm" onclick="previewSceneImg('si_evening','image',0)">👁</button></div>
+      <div class="si-row"><label style="width:90px">夜</label><input id="si_night" value="scenery_night.png" oninput="rCfg()"><button class="btn btn-sm" onclick="previewSceneImg('si_night','image',0)">👁</button></div>
+      <div class="si-row"><label style="width:90px">深夜</label><input id="si_latenight" value="scenery_latenight.png" oninput="rCfg()"><button class="btn btn-sm" onclick="previewSceneImg('si_latenight','image',0)">👁</button></div>
+      <div class="si-row"><label style="width:90px">曇り</label><input id="si_cloudy" value="scenery_cloudy.png" oninput="rCfg()"><button class="btn btn-sm" onclick="previewSceneImg('si_cloudy','image',0)">👁</button></div>
+      <div class="si-row"><label style="width:90px">雨</label><input id="si_rain" value="scenery_rain.png" oninput="rCfg()"><button class="btn btn-sm" onclick="previewSceneImg('si_rain','image',0)">👁</button></div>
+    </div>
+
+    <!-- キャラクター画像 -->
+    <div class="sec">
+      <div class="sec-title">🎭 キャラクター画像（characters）</div>
+      <div class="hint" style="margin-bottom:6px">レイヤー: 2=背面 / 3=中間 / 5=前面　condition: 省略=常時 / sunny_daytime=晴れ昼のみ</div>
+      <div style="font-size:.78rem;font-weight:bold;margin-bottom:4px">chara1 通常プール</div>
+      <div class="img-row-lbl"><span>ファイル名</span><span>Layer</span><span>condition</span><span></span><span></span></div>
+      <div id="c1_pool"></div>
+      <button class="add-row" onclick="addImgRow('c1_pool','character','chara1')">＋ 画像を追加</button>
+      <div style="font-size:.78rem;font-weight:bold;margin:10px 0 4px">chara1 深夜プール <span style="font-weight:normal;color:var(--muted);font-size:.7rem">（23〜6時専用・省略可）</span></div>
+      <div class="img-row-lbl"><span>ファイル名</span><span>Layer</span><span>condition</span><span></span><span></span></div>
+      <div id="c1_late"></div>
+      <button class="add-row" onclick="addImgRow('c1_late','character','chara1')">＋ 画像を追加</button>
+      <div style="font-size:.78rem;font-weight:bold;margin:10px 0 4px">chara2 通常プール</div>
+      <div class="img-row-lbl"><span>ファイル名</span><span>Layer</span><span>condition</span><span></span><span></span></div>
+      <div id="c2_pool"></div>
+      <button class="add-row" onclick="addImgRow('c2_pool','character','chara2')">＋ 画像を追加</button>
+    </div>
+
+    <!-- レイヤープレビュー -->
+    <div class="sec">
+      <div class="sec-title">🖼️ レイヤープレビュー <span class="badge badge-opt">アプリ経由のみ</span></div>
+      <div class="hint" style="margin-bottom:6px">👁 ボタンを押すとここに表示されます。同じレイヤー番号は上書きされます。</div>
+      <div class="preview-canvas-wrap"><canvas id="layer_canvas" width="960" height="540"></canvas></div>
+      <button class="add-row" onclick="clearLayerPreview()">🗑 プレビューをクリア</button>
+    </div>
+
+  </div><!-- /fp -->
+
+  <div style="display:flex;flex-direction:column;background:#1e1408;overflow:hidden;max-height:calc(100vh - 108px)">
+    <div class="pp-head" style="flex-shrink:0">
+      <span>📄 config.yaml プレビュー</span>
+      <div class="pp-actions">
+        <button class="copy-btn" id="copy-config" onclick="copyYaml('config')">コピー</button>
+        <button class="dl-btn" onclick="dlYaml('config','config.yaml')">ダウンロード</button>
+      </div>
+    </div>
+    <pre id="yp-config" class="yp" style="flex:1;overflow:auto"></pre>
+  </div>
+</div>
+
+<!-- ============================= PERSONA ============================= -->
+<div id="tab-persona" class="tab-pane">
+  <div class="fp">
+    <h2>🎭 AIペルソナ設定</h2>
+    <div class="notice">📌 キャラクターと世界観を定義します。プロンプトはキャラ名・舞台設定をもとに自動生成されます。</div>
+    <div class="sec">
+      <div class="sec-title">🌏 舞台設定</div>
+      <div class="field"><label>舞台の説明</label><div class="hint">例: カフェのリビング / シェアハウスのリビング / 宇宙ステーション</div><input id="stage" value="シェアハウスのリビング" oninput="rPersona()"></div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">👤 chara1（メイン・ユーザー応答担当）</div>
+      <div class="row2">
+        <div class="field"><label>名前 <span class="badge badge-req">必須</span></label><input id="mia_name" value="先輩" oninput="rPersona()"></div>
+        <div class="field"><label>一人称</label><input id="mia_first" value="俺" oninput="rPersona()"></div>
+      </div>
+      <div class="field"><label>キャラクター説明</label><textarea id="mia_desc" oninput="rPersona()">シェアハウスの住人。30代の男性。渋めで落ち着きがあり、マイペースに過ごしている。</textarea></div>
+      <div class="field"><label>口調・トーン</label><textarea id="mia_tone" rows="3" oninput="rPersona()">低めのテンションで、淡々と、でも的を射たことを言う。多くを語らず、静かに同調するか軽く受け流す。</textarea></div>
+      <div class="field"><label>禁止事項</label><div id="mia_forb" class="list-ed"></div><button class="add-row" onclick="addForb('mia')">＋ 追加</button></div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">👤 chara2（サブ・呼びかけ応答担当）</div>
+      <div class="row2">
+        <div class="field"><label>名前 <span class="badge badge-req">必須</span></label><input id="mas_name" value="タカシ" oninput="rPersona()"></div>
+        <div class="field"><label>一人称</label><input id="mas_first" value="俺" oninput="rPersona()"></div>
+      </div>
+      <div class="field"><label>キャラクター説明</label><textarea id="mas_desc" oninput="rPersona()">シェアハウスの住人。20代の男性。元気でフットワークが軽く、少しお調子者だが憎めない。</textarea></div>
+      <div class="field"><label>口調・トーン</label><textarea id="mas_tone" rows="3" oninput="rPersona()">感情や思いつきをストレートに口に出す。少しくだけた口調で、テンポよく短く反応する。</textarea></div>
+      <div class="field"><label>禁止事項</label><div id="mas_forb" class="list-ed"></div><button class="add-row" onclick="addForb('master')">＋ 追加</button></div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">🌍 worldセクション</div>
+      <div class="field">
+        <label>chara2 への呼びかけキーワード</label>
+        <div class="hint">メッセージ冒頭にこの語が含まれると chara2 が応答します</div>
+        <div id="kw_list" class="list-ed"></div>
+        <button class="add-row" onclick="addKw()">＋ 追加</button>
+      </div>
+      <hr class="div">
+      <div class="field"><label>ウェルカムメッセージ（通常時）chara1</label><input id="wlc_mia" value="……来たか。まあ、ゆっくりしていけ。" oninput="rPersona()"></div>
+      <div class="field"><label>ウェルカムメッセージ（通常時）chara2</label><input id="wlc_mas" value="あ、お疲れ様っす、待ってましたよ！" oninput="rPersona()"></div>
+      <div class="field"><label>ウェルカムメッセージ（深夜時）chara2のみ</label><input id="wlc_late" value="……まだ起きてたのか。まあ、座れ。" oninput="rPersona()"></div>
+      <hr class="div">
+      <div class="field">
+        <label>フォールバック掛け合い</label>
+        <div class="hint">LLM失敗・バッファ空時の固定セリフ（最低2パターン推奨）</div>
+        <div id="fallback_list"></div>
+        <button class="add-row" onclick="addFallback()">＋ 掛け合いを追加</button>
+      </div>
+    </div>
+  </div>
+  <div class="pp">
+    <div class="pp-head">
+      <span>📄 persona.yaml プレビュー</span>
+      <div class="pp-actions">
+        <button class="copy-btn" id="copy-persona" onclick="copyYaml('persona')">コピー</button>
+        <button class="dl-btn" onclick="dlYaml('persona','persona.yaml')">ダウンロード</button>
+      </div>
+    </div>
+    <pre id="yp-persona" class="yp"></pre>
+  </div>
+</div>
+
+<!-- ============================= THEMES ============================= -->
+<div id="tab-themes" class="tab-pane">
+  <div class="fp">
+    <h2>🌏 世界観設定（トークテーマ）</h2>
+    <div class="notice">📌 放置時にキャラクターが話す話題を定義します。</div>
+    <div id="theme_list"></div>
+    <button class="add-row" style="padding:10px" onclick="addTheme()">＋ テーマを追加</button>
+  </div>
+  <div class="pp">
+    <div class="pp-head">
+      <span>📄 themes.yaml プレビュー</span>
+      <div class="pp-actions">
+        <button class="copy-btn" id="copy-themes" onclick="copyYaml('themes')">コピー</button>
+        <button class="dl-btn" onclick="dlYaml('themes','themes.yaml')">ダウンロード</button>
+      </div>
+    </div>
+    <pre id="yp-themes" class="yp"></pre>
+  </div>
+</div>
+
+<script>
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+function ys(s) {
+  if (!s) return '""';
+  if (/[:#\{\}\[\],&\*\?\|\-<>=!%@`]/.test(s) || s.startsWith(' ') || s.endsWith(' '))
+    return '"' + s.replace(/\\/g,'\\\\').replace(/"/g,'\\"') + '"';
+  return s;
+}
+function getList(id) {
+  return Array.from(document.querySelectorAll(`#${id} .li-row input`)).map(i=>i.value.trim()).filter(Boolean);
+}
+
+function addImgRow(poolId, folder, charaId, file='', layer=5, condition='') {
+  const d = document.createElement('div'); d.className = 'img-row';
+  d.innerHTML = `
+    <input type="text" class="img-file" value="${file}" placeholder="例: chara1_front1.png" oninput="rCfg()">
+    <select class="img-layer" onchange="rCfg()">
+      <option value="2" ${layer==2?'selected':''}>2</option>
+      <option value="3" ${layer==3?'selected':''}>3</option>
+      <option value="5" ${layer==5?'selected':''}>5</option>
+    </select>
+    <select class="img-cond" onchange="rCfg()">
+      <option value="" ${condition==''?'selected':''}>常時</option>
+      <option value="sunny_daytime" ${condition=='sunny_daytime'?'selected':''}>晴れ昼のみ</option>
+      <option value="late_night" ${condition=='late_night'?'selected':''}>深夜のみ</option>
+    </select>
+    <button class="btn btn-sm" title="プレビューに追加" onclick="previewImgRow(this,'${folder}')">👁</button>
+    <button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rCfg()">✕</button>
+  `;
+  document.getElementById(poolId).appendChild(d);
+  rCfg();
+}
+
+function getImgPoolYaml(poolId) {
+  const rows = document.querySelectorAll(`#${poolId} .img-row`);
+  if (!rows.length) return '';
+  let yaml = '';
+  rows.forEach(row => {
+    const file  = row.querySelector('.img-file').value.trim();
+    const layer = row.querySelector('.img-layer').value;
+    const cond  = row.querySelector('.img-cond').value;
+    if (!file) return;
+    yaml += `      - file: "${file}"\n        layer: ${layer}\n`;
+    if (cond) yaml += `        condition: ${cond}\n`;
+  });
+  return yaml;
+}
+
+function onLlmProvChange() {
+  const v = document.getElementById('llm_prov').value;
+  document.getElementById('f_gemini').style.display = v==='gemini' ? '' : 'none';
+  document.getElementById('f_openai').style.display = v==='openai_api' ? '' : 'none';
+  document.getElementById('f_local').style.display  = v==='local' ? '' : 'none';
+  rCfg();
+}
+function onTtsProvChange() {
+  const v = document.getElementById('tts_prov').value;
+  document.getElementById('f_voicevox').style.display = v==='voicevox' ? '' : 'none';
+  document.getElementById('f_sbv2').style.display     = v==='sbv2' ? '' : 'none';
+  rCfg();
+}
+function applyLocalPreset() {
+  const m = {llamacpp:'http://localhost:8080/v1/chat/completions',lmstudio:'http://localhost:1234/v1/chat/completions',ollama:'http://localhost:11434/v1/chat/completions',custom:''};
+  document.getElementById('local_ep').value = m[document.getElementById('local_preset').value] || '';
+  rCfg();
+}
+function addBgmRow(file='assets/bgm/bgm.mp3', start=0) {
+  const c = document.getElementById('bgm_schedules');
+  const d = document.createElement('div'); d.className='bgm-row';
+  d.innerHTML=`<input type="text" value="${file}" placeholder="assets/bgm/bgm.mp3" oninput="rCfg()"><input type="number" min="0" max="23" value="${start}" oninput="rCfg()"><button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rCfg()">✕</button>`;
+  c.appendChild(d); rCfg();
+}
+
+function rCfg() {
+  const prov = document.getElementById('llm_prov').value;
+  const temp = document.getElementById('temperature').value;
+  const maxTok = document.getElementById('max_tokens').value;
+  let llmBlock = '';
+
+  if (prov==='gemini') {
+    const key = document.getElementById('gemini_key').value || 'YOUR_GEMINI_API_KEY';
+    const mdl = document.getElementById('gemini_model').value;
+    llmBlock = `llm:\n  provider: "gemini"\n  gemini_model: "${mdl}"\n  max_tokens: ${maxTok}\n  temperature: ${temp}`;
+  } else if (prov==='openai_api') {
+    const key = document.getElementById('oai_key').value || 'sk-...';
+    const mdl = document.getElementById('oai_model').value;
+    llmBlock = `llm:\n  provider: "openai"\n  endpoint: "https://api.openai.com/v1/chat/completions"\n  api_key: "${key}"\n  model: "${mdl}"\n  max_tokens: ${maxTok}\n  temperature: ${temp}`;
+  } else {
+    const ep  = document.getElementById('local_ep').value;
+    const mdl = document.getElementById('local_model').value;
+    llmBlock = `llm:\n  provider: "openai"\n  endpoint: "${ep}"\n  api_key: ""\n  model: "${mdl}"\n  max_tokens: ${maxTok}\n  temperature: ${temp}`;
+  }
+
+  // geminiセクション：LLMプロバイダーに関係なく常に出力
+  // - Gemini LLM選択時: gemini_keyを使用
+  // - それ以外: google_search_keyを使用（空でもセクションは出力）
+  const geminiApiKey = prov === 'gemini'
+    ? (document.getElementById('gemini_key').value || '')
+    : (document.getElementById('google_search_key').value || '');
+  const geminiModel = prov === 'gemini'
+    ? document.getElementById('gemini_model').value
+    : 'gemini-2.0-flash';
+  const geminiBlock = `\n# Google検索（今日の話題）— LLM設定に関係なく常にGemini APIを使用\n# api_keyが空の場合はThemeFetcherが無効になり今日の話題は生成されません\ngemini:\n  api_key: "${geminiApiKey}"\n  model: "${geminiModel}"\n  grounding: true\n  fetch_interval: 3600`;
+
+  const ttsProv = document.getElementById('tts_prov').value;
+  const ttsVol  = document.getElementById('tts_vol').value;
+  let ttsBlock = `tts:\n  provider: "${ttsProv}"\n  volume: ${ttsVol}\n  dict_file: "tts_dict.yaml"`;
+  if (ttsProv==='voicevox') {
+    ttsBlock += `\n  voicevox_endpoint: "${document.getElementById('vv_endpoint').value}"\n  mia_speaker_id: ${document.getElementById('mia_id').value}\n  master_speaker_id: ${document.getElementById('mas_id').value}\n  speed_scale: ${document.getElementById('speed_scale').value}\n  pitch_scale: ${document.getElementById('pitch_scale').value}`;
+  } else {
+    ttsBlock += `\n  endpoint: "${document.getElementById('sbv2_endpoint').value}"\n  mia_model_name: "${document.getElementById('sbv2_mia').value}"\n  master_model_name: "${document.getElementById('sbv2_mas').value}"\n  speed: ${document.getElementById('sbv2_speed').value}`;
+  }
+
+  const bgmVol = document.getElementById('bgm_vol').value;
+  const bgmRows = document.querySelectorAll('#bgm_schedules .bgm-row');
+  let schedYaml = '';
+  bgmRows.forEach(r=>{const ins=r.querySelectorAll('input');schedYaml+=`    - file: "${ins[0].value}"\n      start: ${ins[1].value}\n`;});
+  if (!schedYaml) schedYaml = `    - file: "assets/bgm/bgm.mp3"\n      start: 0\n`;
+
+  const g = id => (document.getElementById(id)?.value.trim() || '');
+  const sceneImagesBlock =
+`scene_images:
+  bg_indoor: "${g('si_bg')}"
+  obj_mid: "${g('si_objmid')}"
+  obj_front: "${g('si_objfront')}"
+  scenery:
+    day: "${g('si_day')}"
+    dawn: "${g('si_dawn')}"
+    evening: "${g('si_evening')}"
+    night: "${g('si_night')}"
+    latenight: "${g('si_latenight')}"
+    cloudy: "${g('si_cloudy')}"
+    rain: "${g('si_rain')}"`;
+
+  const c1pool = getImgPoolYaml('c1_pool');
+  const c1late = getImgPoolYaml('c1_late');
+  const c2pool = getImgPoolYaml('c2_pool');
+  let charactersBlock = '';
+  if (c1pool || c2pool) {
+    charactersBlock = `\n# キャラクター画像設定\ncharacters:`;
+    if (c1pool) {
+      charactersBlock += `\n  chara1:\n    pool:\n${c1pool}`;
+      if (c1late) charactersBlock += `    late_night_pool:\n${c1late}`;
+    }
+    if (c2pool) {
+      charactersBlock += `  chara2:\n    pool:\n${c2pool}`;
+    }
+  }
+
+  const title = document.getElementById('overlay_title').value;
+  const wEn   = document.getElementById('weather_en').checked;
+  const lat   = document.getElementById('lat').value;
+  const lng   = document.getElementById('lng').value;
+
+  document.getElementById('yp-config').textContent = `# config.yaml - セットアップウィザードで生成
+
+websocket:
+  host: "0.0.0.0"
+  port: 8765
+
+# LLM設定
+${llmBlock}
+
+# STT設定
+stt:
+  provider: "browser"
+  language: "ja-JP"
+
+# TTS設定
+${ttsBlock}
+
+# BGM設定
+bgm:
+  enabled: false
+  volume: ${bgmVol}
+  schedules:
+${schedYaml}
+# 画面設定
+scene:
+  overlay_title: "${title}"
+
+# 天気連動
+weather:
+  enabled: ${wEn}
+  latitude: ${lat}
+  longitude: ${lng}
+  fetch_interval: 1800
+
+# 背景・風景画像設定
+${sceneImagesBlock}
+${charactersBlock}
+
+# HTTP設定
+http:
+  port: 8766
+
+# テーマ設定
+theme:
+  themes_file: "themes.yaml"
+
+# Generator設定
+generator:
+  idle_timeout: 300
+  scenario_buffer_min: 2
+  scenario_buffer_max: 5
+  scenario_buffer_refill_interval: 30
+  context_window: 10
+  late_night_start: 23
+  late_night_end: 6
+
+# 記憶設定
+memory:
+  db_path: "data/memory.db"
+  extract_interval: 5
+  max_memories_in_prompt: 10
+  initial_memories:
+    - category: fact
+      content: "名前はまだ知らない"
+${geminiBlock}
+
+memory_server:
+  port: 8767
+
+speaker:
+  filler_threshold_ms: 1000
+  inter_line_pause: 0.8
+
+queues:
+  ws_voice_queue_maxsize: 5
+  voice_queue_maxsize: 10
+  output_queue_maxsize: 10`.trim();
+}
+
+async function testTts(chara) {
+  const st=document.getElementById('tts_status');
+  const prov=document.getElementById('tts_prov').value;
+  st.innerHTML='<span class="status status-pending">テスト中...</span>';
+  try {
+    const text=document.getElementById('tts_test_text').value||'テスト音声です';
+    const vol=parseFloat(document.getElementById('tts_vol').value);
+    let payload={provider:prov,text};
+    if (prov==='voicevox') {
+      payload.endpoint=document.getElementById('vv_endpoint').value||'http://localhost:50021';
+      payload.speaker_id=chara==='mia'?parseInt(document.getElementById('mia_id').value):parseInt(document.getElementById('mas_id').value);
+      payload.speed_scale=parseFloat(document.getElementById('speed_scale').value);
+      payload.pitch_scale=parseFloat(document.getElementById('pitch_scale').value);
+    } else {
+      payload.endpoint=document.getElementById('sbv2_endpoint').value||'http://localhost:5000';
+      payload.model_name=chara==='mia'?document.getElementById('sbv2_mia').value:document.getElementById('sbv2_mas').value;
+      payload.speed=parseFloat(document.getElementById('sbv2_speed').value);
+    }
+    const res=await fetch('/api/tts_test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if (!res.ok){const err=await res.json().catch(()=>({error:'不明なエラー'}));st.innerHTML=`<span class="status status-ng">❌ ${err.error}</span>`;return;}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const aud=new Audio(url);
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=ctx.createMediaElementSource(aud);
+    const gain=ctx.createGain(); gain.gain.value=vol;
+    src.connect(gain); gain.connect(ctx.destination);
+    await ctx.resume(); aud.play();
+    st.innerHTML='<span class="status status-ok">✅ 再生中</span>';
+    aud.onended=()=>{st.innerHTML='<span class="status status-ok">✅ 再生完了</span>';ctx.close();};
+  } catch(e){st.innerHTML=`<span class="status status-ng">❌ ${e.message}</span>`;}
+}
+
+let _bgmPlaying=false;
+function toggleBgmTest() {
+  const aud=document.getElementById('bgm_test_audio');
+  const st=document.getElementById('bgm_status');
+  if (_bgmPlaying){aud.pause();aud.currentTime=0;_bgmPlaying=false;st.textContent='停止しました';return;}
+  const rows=document.querySelectorAll('#bgm_schedules .bgm-row');
+  if (!rows.length){st.textContent='BGMスケジュールがありません';return;}
+  const file=rows[0].querySelectorAll('input')[0].value;
+  aud.src='/'+file.replace(/^\//,'');
+  aud.volume=parseFloat(document.getElementById('bgm_vol').value);
+  aud.play().then(()=>{_bgmPlaying=true;st.textContent=`再生中: ${file}`;}).catch(e=>{st.textContent=`❌ ${e.message}`;});
+  aud.onended=()=>{_bgmPlaying=false;};
+}
+function updateBgmVolume(){document.getElementById('bgm_test_audio').volume=parseFloat(document.getElementById('bgm_vol').value);}
+
+async function searchLocation() {
+  const q=document.getElementById('location_name').value.trim();
+  const st=document.getElementById('loc_status');
+  if (!q) return;
+  st.textContent='検索中...';
+  try {
+    const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,{headers:{'Accept-Language':'ja'}});
+    const data=await res.json();
+    if (!data.length){st.textContent='❌ 見つかりませんでした';return;}
+    const {lat,lon,display_name}=data[0];
+    document.getElementById('lat').value=parseFloat(lat).toFixed(4);
+    document.getElementById('lng').value=parseFloat(lon).toFixed(4);
+    st.textContent=`✅ ${display_name.split(',').slice(0,3).join(',')}`;
+    rCfg();
+  } catch(e){st.textContent=`❌ 検索エラー: ${e.message}`;}
+}
+
+const _layerImgs = {};
+function clearLayerPreview() {
+  Object.keys(_layerImgs).forEach(k=>delete _layerImgs[k]);
+  const canvas=document.getElementById('layer_canvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,960,540);
+  ctx.fillStyle='#1a0f0a'; ctx.fillRect(0,0,960,540);
+}
+function redrawAllLayers() {
+  const canvas=document.getElementById('layer_canvas');
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,960,540);
+  ctx.fillStyle='#1a0f0a'; ctx.fillRect(0,0,960,540);
+  Object.keys(_layerImgs).map(Number).sort((a,b)=>a-b).forEach(k=>{
+    ctx.globalAlpha=1;
+    ctx.drawImage(_layerImgs[k],0,0,960,540);
+  });
+}
+async function _loadAndDraw(src, layerKey) {
+  const img = await new Promise(resolve=>{
+    const i=new Image();
+    i.onload=()=>resolve(i); i.onerror=()=>resolve(null); i.src=src;
+  });
+  if (!img){ alert(`❌ 読み込み失敗: ${src}`); return; }
+  _layerImgs[layerKey] = img;
+  redrawAllLayers();
+}
+async function previewSceneImg(inputId, folder, layer) {
+  const val = document.getElementById(inputId)?.value.trim();
+  if (!val){ alert('ファイル名を入力してください'); return; }
+  await _loadAndDraw(`/assets/${folder}/${val}`, layer);
+}
+async function previewImgRow(btn, folder) {
+  const row=btn.parentNode;
+  const file=row.querySelector('.img-file').value.trim();
+  const layer=parseInt(row.querySelector('.img-layer').value);
+  if (!file){ alert('ファイル名を入力してください'); return; }
+  await _loadAndDraw(`/assets/${folder}/${file}`, layer);
+}
+
+function addForb(chara){
+  const id=chara==='mia'?'mia_forb':'mas_forb';
+  const d=document.createElement('div');d.className='li-row';
+  d.innerHTML=`<input type="text" placeholder="禁止事項" oninput="rPersona()"><button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rPersona()">✕</button>`;
+  document.getElementById(id).appendChild(d);rPersona();
+}
+function addKw(){
+  const d=document.createElement('div');d.className='li-row';
+  d.innerHTML=`<input type="text" placeholder="呼びかけキーワード" oninput="rPersona()"><button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rPersona()">✕</button>`;
+  document.getElementById('kw_list').appendChild(d);rPersona();
+}
+function addFallback(miaText='',masText=''){
+  const mn=document.getElementById('mia_name').value||'chara1';
+  const mmn=document.getElementById('mas_name').value||'chara2';
+  const d=document.createElement('div');d.className='pair-card';
+  d.innerHTML=`<button class="pair-del" onclick="this.parentNode.remove();rPersona()">✕</button>
+    <div class="d-line"><span class="sp-tag sp-mia">${mn}</span><input type="text" value="${miaText}" placeholder="${mn}のセリフ" oninput="rPersona()"></div>
+    <div class="d-line"><span class="sp-tag sp-mas">${mmn}</span><input type="text" value="${masText}" placeholder="${mmn}のセリフ" oninput="rPersona()"></div>`;
+  document.getElementById('fallback_list').appendChild(d);rPersona();
+}
+function rPersona(){
+  const stage=document.getElementById('stage').value||'部屋';
+  const mn=document.getElementById('mia_name').value||'Mia';
+  const mf=document.getElementById('mia_first').value||'わたし';
+  const md=document.getElementById('mia_desc').value||'';
+  const mt=document.getElementById('mia_tone').value||'';
+  const mfb=getList('mia_forb');
+  const mmn=document.getElementById('mas_name').value||'Master';
+  const mmf=document.getElementById('mas_first').value||'ぼく';
+  const mmd=document.getElementById('mas_desc').value||'';
+  const mmt=document.getElementById('mas_tone').value||'';
+  const mmfb=getList('mas_forb');
+  const kws=getList('kw_list');
+  const wMia=document.getElementById('wlc_mia').value;
+  const wMas=document.getElementById('wlc_mas').value;
+  const wLate=document.getElementById('wlc_late').value;
+  const mfbY=mfb.map(f=>`    - ${ys(f)}`).join('\n')||`    - "長文の説明"`;
+  const mmfbY=mmfb.map(f=>`    - ${ys(f)}`).join('\n')||`    - "長文の説明"`;
+  const kwY=kws.map(k=>`    - ${ys(k)}`).join('\n')||`    - ${ys(mmn)}`;
+  let fallY='';
+  document.querySelectorAll('#fallback_list .pair-card').forEach(c=>{
+    const ins=c.querySelectorAll('input');
+    const t1=ins[0]?.value||'';const t2=ins[1]?.value||'';
+    if(t1||t2) fallY+=`    - - speaker: "mia"\n        text: ${ys(t1)}\n      - speaker: "master"\n        text: ${ys(t2)}\n`;
+  });
+  if(!fallY) fallY=`    - - speaker: "mia"\n        text: "……。"\n      - speaker: "master"\n        text: "……。"\n`;
+  const followup=`${mmn}が「{master_response}」と言いました。\n    ${mn}として一言だけ短く添えてください。1文のみ。テキストのみ出力。`;
+  document.getElementById('yp-persona').textContent=`# persona.yaml - セットアップウィザードで生成
+
+mia:
+  name: ${ys(mn)}
+  description: ${ys(md)}
+  first_person: ${ys(mf)}
+  tone: |
+    ${mt.split('\n').join('\n    ')}
+  forbidden:
+${mfbY}
+
+master:
+  name: ${ys(mmn)}
+  description: ${ys(mmd)}
+  first_person: ${ys(mmf)}
+  tone: |
+    ${mmt.split('\n').join('\n    ')}
+  forbidden:
+${mmfbY}
+
+world:
+  master_keywords:
+${kwY}
+
+  welcome:
+    - speaker: "mia"
+      text: ${ys(wMia)}
+    - speaker: "master"
+      text: ${ys(wMas)}
+
+  welcome_late_night:
+    - speaker: "master"
+      text: ${ys(wLate)}
+
+  mia_followup_prompt: |
+    ${followup}
+
+  fallback_dialogues:
+${fallY}
+prompts:
+  dialogue_generation: |
+    ${stage}での、${mn}と${mmn}との3ターンの掛け合いを生成してください。
+
+    現在の状況: {real_world_context}
+    話題: {theme_title}
+    話題の説明: {theme_prompt}
+
+    【出力形式（厳守）】
+    ${mn}: [${mn}の最初の発言。1文]
+    ${mmn}: [${mmn}の返答。1〜2文]
+    ${mn}: [${mn}の返答。1〜2文]
+    ${mmn}: [${mmn}の返答。1〜2文]
+    ${mn}: [${mn}の返し。1文]
+    ${mmn}: [${mmn}の締め。1文]
+
+    【条件】
+    - 必ず上記の6行形式で出力すること。他の文章は不要
+    ${mn}の設定: {mia_persona}
+    ${mmn}の設定: {master_persona}
+
+  comment_response: |
+    ユーザーから声がかかりました。${mn}として自然に応じてください。
+    現在の状況: {real_world_context}
+    ユーザーの発言: {user_message}
+    現在のトーク文脈: {context}
+    キャラクター設定: {persona}
+    【ユーザーの記憶】
+    {memory_summary}
+    【トーンの指示】
+    - 1〜2文。テキストのみ出力。
+    【ゲームイベントの場合】
+    メッセージが「[ゲーム:」で始まる場合はプレイヤーとして1文のみ返す。テキストのみ出力。
+
+  master_monologue: |
+    深夜の${stage}。${mn}は不在。${mmn}が一人でいる。
+    今の時間帯・話題を踏まえて、${mmn}の独り言を生成してください。
+    現在の状況: {real_world_context}
+    話題: {theme_title}
+    話題の説明: {theme_prompt}
+    【出力形式（厳守）】
+    ${mmn}: [ひとこと。1文]
+    ${mmn}: [もうひとこと。1文、任意]
+    ${mmn}の設定: {master_persona}
+
+  master_solo_response: |
+    深夜の${stage}。${mn}は不在。${mmn}として答えてください。
+    現在の状況: {real_world_context}
+    ユーザーの発言: {user_message}
+    会話の文脈: {context}
+    ユーザーの記憶: {memory_summary}
+    条件: 1〜2文のみ。テキストのみ出力。
+    ${mmn}の設定: {master_persona}
+
+  master_relay: |
+    ユーザーが${mmn}に話しかけています。${mn}として${mmn}に中継してください。
+    ユーザーの発言: {user_message}
+    条件: 1文のみ。${mmn}への呼びかけから始める。テキストのみ出力。
+    ${mn}の設定: {mia_persona}
+
+  master_direct_response: |
+    ${stage}の${mn}として答えてください。
+    現在の状況: {real_world_context}
+    ユーザーの発言: {user_message}
+    ${mn}の中継: {relay_text}
+    会話の文脈: {context}
+    ユーザーの記憶: {memory_summary}
+    条件: 1〜2文のみ。テキストのみ出力。
+    ${mmn}の設定: {master_persona}
+
+  memory_extract: |
+    以下の会話から、ユーザーについて覚えておくべき情報を抽出してください。
+    会話履歴:
+    {conversation}
+    【出力形式（厳守）】
+    [
+      {{"category": "fact", "content": "内容", "source": "発言元"}},
+      {{"category": "preference", "content": "内容", "source": "発言元"}}
+    ]
+    JSONのみ出力。`.trim();
+}
+
+function addTheme(id='',title='',prompt='',kw=''){
+  const idx=document.querySelectorAll('.theme-card').length+1;
+  const d=document.createElement('div');d.className='theme-card';
+  d.innerHTML=`<button class="card-del" onclick="this.parentNode.remove();rThemes()">✕</button>
+    <div class="row2">
+      <div class="field"><label>ID</label><input class="th-id" value="${id||'theme_'+idx}" oninput="rThemes()"></div>
+      <div class="field"><label>タイトル</label><input class="th-title" value="${title}" placeholder="例: 今日の話題" oninput="rThemes()"></div>
+    </div>
+    <div class="field"><label>プロンプト</label><textarea class="th-prompt" rows="2" placeholder="どんな内容で話してほしいかを書いてください" oninput="rThemes()">${prompt}</textarea></div>
+    <div class="field"><label>キーワード（カンマ区切り）</label><input class="th-kw" value="${kw}" placeholder="キーワード1, キーワード2" oninput="rThemes()"></div>`;
+  document.getElementById('theme_list').appendChild(d);rThemes();
+}
+function rThemes(){
+  let yaml=`# themes.yaml - セットアップウィザードで生成\n\nthemes:\n`;
+  document.querySelectorAll('.theme-card').forEach(c=>{
+    const id=c.querySelector('.th-id').value||'theme';
+    const title=c.querySelector('.th-title').value||'';
+    const prompt=c.querySelector('.th-prompt').value||'';
+    const kws=c.querySelector('.th-kw').value.split(',').map(k=>k.trim()).filter(Boolean);
+    const kwY=kws.length?'['+kws.map(k=>`"${k}"`).join(', ')+']':'[]';
+    yaml+=`  - id: "${id}"\n    title: ${ys(title)}\n    prompt: ${ys(prompt)}\n    keywords: ${kwY}\n\n`;
+  });
+  document.getElementById('yp-themes').textContent=yaml.trim();
+}
+
+function copyYaml(tab){
+  navigator.clipboard.writeText(document.getElementById('yp-'+tab).textContent).then(()=>{
+    const btn=document.getElementById('copy-'+tab);
+    btn.textContent='✓ コピー済み';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='コピー';btn.classList.remove('copied');},2000);
+  });
+}
+function dlYaml(tab,filename){
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([document.getElementById('yp-'+tab).textContent],{type:'text/yaml'})),download:filename});
+  a.click();
+}
+
+function init(){
+  addBgmRow('assets/bgm/bgm.mp3',0);
+  addImgRow('c1_pool','character','chara1','chara1_front1.png',5,'');
+  addImgRow('c1_pool','character','chara1','chara1_front2.png',5,'');
+  addImgRow('c1_pool','character','chara1','chara1_front3.png',5,'');
+  addImgRow('c1_pool','character','chara1','chara1_clean.png',2,'');
+  addImgRow('c1_pool','character','chara1','chara1_rest.png',2,'sunny_daytime');
+  addImgRow('c1_late','character','chara1','chara1_sleep.png',5,'');
+  addImgRow('c2_pool','character','chara2','chara2_front1.png',5,'');
+  addImgRow('c2_pool','character','chara2','chara2_front2.png',5,'');
+  addImgRow('c2_pool','character','chara2','chara2_back1.png',3,'');
+  addImgRow('c2_pool','character','chara2','chara2_back2.png',3,'');
+  [['mia_forb',['長い文での説明や説教','感情を大きく表に出すこと','1〜2文まで']],
+   ['mas_forb',['堅苦しい説明口調','1応答2文まで']]].forEach(([id,vals])=>{
+    vals.forEach(v=>{
+      const d=document.createElement('div');d.className='li-row';
+      d.innerHTML=`<input type="text" value="${v}" oninput="rPersona()"><button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rPersona()">✕</button>`;
+      document.getElementById(id).appendChild(d);
+    });
+  });
+  ['先輩','タカシ'].forEach(v=>{
+    const d=document.createElement('div');d.className='li-row';
+    d.innerHTML=`<input type="text" value="${v}" oninput="rPersona()"><button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rPersona()">✕</button>`;
+    document.getElementById('kw_list').appendChild(d);
+  });
+  addFallback('……飯、どうする。','あ、俺コンビニ行きますよ！何か買ってきましょうか？');
+  addFallback('お前のPC、ファンの音うるさいぞ。','え、マジっすか？後でエアダスター貸してください！');
+  addTheme('topic1','最近の話題','最近気になっていることや、日常の出来事について話す。','最近, 話題, 日常');
+  addTheme('topic2','趣味の話','お互いの趣味や好きなことについて話す。','趣味, 好き, 楽しい');
+  clearLayerPreview();
+  rCfg(); rPersona(); rThemes();
+}
+init();
+</script>
+</body>
+</html>

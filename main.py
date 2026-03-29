@@ -3,12 +3,14 @@ Cafe Lumiere - エントリーポイント (vA1 配布版)
 """
 import asyncio
 import logging
+import shutil
 import signal
 import ssl
 import sys
 from pathlib import Path
 
 import yaml
+import aiohttp as _aiohttp
 from aiohttp import web
 
 logging.basicConfig(
@@ -20,13 +22,26 @@ logger = logging.getLogger("main")
 
 
 def load_config(path: str = "config.yaml") -> dict:
+    config_path  = Path(path)
+    example_path = Path("config.yaml.example")
+
+    # config.yaml がなければ example から自動コピーして起動
+    if not config_path.exists():
+        if example_path.exists():
+            shutil.copy(example_path, config_path)
+            logger.warning("⚠️  config.yaml が見つからないため config.yaml.example からコピーしました。")
+            logger.warning("⚠️  http://localhost:8766/setup_wizard/ で設定を完了してください。")
+        else:
+            logger.error("❌ config.yaml も config.yaml.example も見つかりません。")
+            sys.exit(1)
+
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
-        logger.info(f"✅ 設定読み込み: {path}")
+        logger.info(f"✅ 設定読み込み: {config_path}")
         return config
-    except FileNotFoundError:
-        logger.error(f"❌ 設定ファイルが見つかりません: {path}")
+    except Exception as e:
+        logger.error(f"❌ 設定ファイルの読み込みエラー: {e}")
         sys.exit(1)
 
 
@@ -85,6 +100,9 @@ async def start_http_server(config: dict, shutdown_event: asyncio.Event, ssl_con
 
     app = web.Application()
 
+    # ----------------------------------------------------------
+    # /api/config
+    # ----------------------------------------------------------
     async def handle_api_config(request):
         bgm_cfg        = config.get("bgm", {})
         stt_cfg        = config.get("stt", {})
@@ -118,16 +136,109 @@ async def start_http_server(config: dict, shutdown_event: asyncio.Event, ssl_con
             },
         })
 
-    app.router.add_get("/api/config", handle_api_config)
+    # ----------------------------------------------------------
+    # /api/tts_test  ← セットアップウィザード用 TTSプロキシ
+    # VOICEVOX / Style-Bert-VITS2 両対応
+    # ----------------------------------------------------------
+    async def handle_tts_test(request):
+        try:
+            body     = await request.json()
+            provider = body.get("provider", "voicevox")
+            text     = body.get("text", "テスト音声です")
 
+            async with _aiohttp.ClientSession(
+                timeout=_aiohttp.ClientTimeout(total=15)
+            ) as session:
+
+                if provider == "voicevox":
+                    endpoint   = body.get("endpoint", "http://localhost:50021")
+                    speaker_id = int(body.get("speaker_id", 3))
+                    speed      = float(body.get("speed_scale", 1.0))
+                    pitch      = float(body.get("pitch_scale", 0.0))
+
+                    async with session.post(
+                        f"{endpoint}/audio_query",
+                        params={"text": text, "speaker": speaker_id},
+                    ) as resp:
+                        if resp.status != 200:
+                            return web.json_response(
+                                {"error": f"audio_query failed: {resp.status}"}, status=502
+                            )
+                        query = await resp.json()
+
+                    query["speedScale"] = speed
+                    query["pitchScale"] = pitch
+
+                    async with session.post(
+                        f"{endpoint}/synthesis",
+                        params={"speaker": speaker_id},
+                        json=query,
+                        headers={"Content-Type": "application/json"},
+                    ) as resp:
+                        if resp.status != 200:
+                            return web.json_response(
+                                {"error": f"synthesis failed: {resp.status}"}, status=502
+                            )
+                        wav = await resp.read()
+
+                elif provider == "sbv2":
+                    endpoint   = body.get("endpoint", "http://localhost:5000")
+                    model_name = body.get("model_name", "woman001")
+                    speed      = float(body.get("speed", 1.0))
+
+                    async with session.get(
+                        f"{endpoint}/voice",
+                        params={"text": text, "model_name": model_name, "length": speed},
+                    ) as resp:
+                        if resp.status != 200:
+                            return web.json_response(
+                                {"error": f"SBV2 synthesis failed: {resp.status}"}, status=502
+                            )
+                        wav = await resp.read()
+
+                else:
+                    return web.json_response(
+                        {"error": f"未対応のprovider: {provider}"}, status=400
+                    )
+
+            return web.Response(
+                body=wav,
+                content_type="audio/wav",
+                headers={"Access-Control-Allow-Origin": "*"},
+            )
+
+        except _aiohttp.ClientConnectorError as e:
+            return web.json_response(
+                {"error": f"TTSサーバーに接続できません: {e}"}, status=503
+            )
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    app.router.add_get ("/api/config",   handle_api_config)
+    app.router.add_post("/api/tts_test", handle_tts_test)
+
+    # ----------------------------------------------------------
+    # 静的ファイル
+    # ----------------------------------------------------------
     assets_path = Path("assets").resolve()
     if assets_path.exists():
         app.router.add_static("/assets", assets_path)
+
+    # setup_wizard（ユーザーが任意でアクセス）
+    wizard_path = Path("setup_wizard").resolve()
+    if wizard_path.exists():
+        async def handle_wizard(request):
+            return web.FileResponse(wizard_path / "index.html")
+        app.router.add_get("/setup_wizard",  handle_wizard)
+        app.router.add_get("/setup_wizard/", handle_wizard)
+        app.router.add_static("/setup_wizard", wizard_path)
+        logger.info("🧙 セットアップウィザード: /setup_wizard/")
 
     frontend_path = Path("frontend").resolve()
 
     async def handle_index(request):
         return web.FileResponse(frontend_path / "index.html")
+
     app.router.add_get("/", handle_index)
     app.router.add_static("/", frontend_path, show_index=False)
 
