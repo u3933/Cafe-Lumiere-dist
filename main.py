@@ -20,8 +20,14 @@ from pathlib import Path
 # BASE_DIR 基準で参照する。
 # ----------------------------------------------------------------
 if getattr(sys, 'frozen', False):
-    # PyInstaller でビルドされた EXE として実行中
-    BASE_DIR = Path(sys.executable).parent
+    if sys.platform == 'darwin':
+        # macOS .app: 設定・YAMLファイルは Application Support に保存
+        # .app を更新・再インストールしても設定が消えない
+        BASE_DIR = Path.home() / 'Library' / 'Application Support' / 'CafeLumiere'
+        BASE_DIR.mkdir(parents=True, exist_ok=True)
+    else:
+        # Windows EXE: EXE と同じディレクトリ
+        BASE_DIR = Path(sys.executable).parent
 else:
     # 通常の python main.py 実行
     BASE_DIR = Path(__file__).parent
