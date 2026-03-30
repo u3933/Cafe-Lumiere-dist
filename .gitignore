@@ -11,6 +11,8 @@ venv/
 env/
 certs/
 backup/
+build/
+dist/
 
 # 設定ファイル（APIキー・個人情報を含む）
 config.yaml

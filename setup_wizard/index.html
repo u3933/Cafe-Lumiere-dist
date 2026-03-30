@@ -796,7 +796,7 @@ mia:
   description: ${ys(md)}
   first_person: ${ys(mf)}
   tone: |
-    ${mt.split('\n').join('\n    ')}
+    ${mt.trim().split('\n').map(l=>l.trim()).join('\n    ')}
   forbidden:
 ${mfbY}
 
@@ -805,7 +805,7 @@ master:
   description: ${ys(mmd)}
   first_person: ${ys(mmf)}
   tone: |
-    ${mmt.split('\n').join('\n    ')}
+    ${mmt.trim().split('\n').map(l=>l.trim()).join('\n    ')}
   forbidden:
 ${mmfbY}
 
@@ -955,27 +955,53 @@ function init(){
   addImgRow('c1_pool','character','chara1','chara1_clean.png',2,'');
   addImgRow('c1_pool','character','chara1','chara1_rest.png',2,'sunny_daytime');
   addImgRow('c1_late','character','chara1','chara1_sleep.png',5,'');
-  addImgRow('c2_pool','character','chara2','chara2_front1.png',5,'');
-  addImgRow('c2_pool','character','chara2','chara2_front2.png',5,'');
-  addImgRow('c2_pool','character','chara2','chara2_back1.png',3,'');
-  addImgRow('c2_pool','character','chara2','chara2_back2.png',3,'');
-  [['mia_forb',['長い文での説明や説教','感情を大きく表に出すこと','1〜2文まで']],
-   ['mas_forb',['堅苦しい説明口調','1応答2文まで']]].forEach(([id,vals])=>{
+  addImgRow('c2_pool','character','chara2','chara2_front.png',3,'');
+  addImgRow('c2_pool','character','chara2','chara2_back.png',3,'');
+
+  // chara1（ミア）設定
+  document.getElementById('mia_name').value = 'ミア';
+  document.getElementById('mia_first').value = 'あたし';
+  document.getElementById('mia_desc').value = 'カフェ Cafe Lumiere のスタッフ。明るくてノリのいいギャル。お客さんとも距離が近くてフレンドリー。';
+  document.getElementById('mia_tone').value = '感情や感覚をテンション高めに、ストレートに口に出す。\n「え、めっちゃいいじゃん！」「それなー！」「やば〜」のように短く、ノリ良く反応する。\n語尾は適度に伸ばす（〜だし、〜じゃね？）。難しい説明や理由は省く。';
+  [['mia_forb',['「〜だから〜だよ」のような理屈っぽい説明口調','「〜です・ます」のような硬すぎる敬語','一文に情報を詰め込みすぎない','1応答2文まで']],
+   ['mas_forb',['キツい言い切りや、冷たい印象を与える短い断言','長い文で説明しない','「〜だから〜」という理由の連鎖を作らない','1〜2文まで']]].forEach(([id,vals])=>{
     vals.forEach(v=>{
       const d=document.createElement('div');d.className='li-row';
       d.innerHTML=`<input type="text" value="${v}" oninput="rPersona()"><button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rPersona()">✕</button>`;
       document.getElementById(id).appendChild(d);
     });
   });
-  ['先輩','タカシ'].forEach(v=>{
+
+  // chara2（マスター）設定
+  document.getElementById('mas_name').value = 'マスター';
+  document.getElementById('mas_first').value = '私';
+  document.getElementById('mas_desc').value = 'カフェのオーナーマスター。おっとりしていて包容力のあるお姉さん。いつもニコニコ見守っている。';
+  document.getElementById('mas_tone').value = '言葉数は少なめだが、ゆったりと温かみのある口調。\n「〜ねぇ」「〜のかしら」「ふふっ」といった柔らかい表現を使う。\n説明はせず、相手の言葉を優しく受け止めるか、穏やかに問いかける。';
+
+  // 舞台設定
+  document.getElementById('stage').value = 'カフェ Cafe Lumiere のカウンター';
+
+  // world設定
+  ['マスター','大将','店長','オーナー'].forEach(v=>{
     const d=document.createElement('div');d.className='li-row';
     d.innerHTML=`<input type="text" value="${v}" oninput="rPersona()"><button class="btn btn-sm btn-danger" onclick="this.parentNode.remove();rPersona()">✕</button>`;
     document.getElementById('kw_list').appendChild(d);
   });
-  addFallback('……飯、どうする。','あ、俺コンビニ行きますよ！何か買ってきましょうか？');
-  addFallback('お前のPC、ファンの音うるさいぞ。','え、マジっすか？後でエアダスター貸してください！');
-  addTheme('topic1','最近の話題','最近気になっていることや、日常の出来事について話す。','最近, 話題, 日常');
-  addTheme('topic2','趣味の話','お互いの趣味や好きなことについて話す。','趣味, 好き, 楽しい');
+  document.getElementById('wlc_mia').value = 'いらっしゃいませ！Cafe Lumiereへようこそ。';
+  document.getElementById('wlc_mas').value = 'ゆっくりしていってください。';
+  document.getElementById('wlc_late').value = 'いらっしゃい。静かな時間だけど、ゆっくりしていって。';
+
+  // フォールバック
+  addFallback('マスター、最近新しいコーヒー豆は入りましたか？','そうそう、エチオピアのイエルガチェフェが届いたよ。フルーティな香りが特徴でね。');
+  addFallback('マスター、コーヒーの香りって本当に落ち着きますよね。','うん、豆を挽いた瞬間の香りは特別だよね。');
+
+  // テーマ
+  addTheme('coffee','今日のコーヒー','今日のおすすめコーヒー豆や抽出方法について話す。エチオピア豆のフルーティな風味など。','コーヒー, 豆, 抽出, カフェ, ラテ, エスプレッソ');
+  addTheme('weather','今日の天気と気分','今日の天気や季節の話題。外の景色やカフェの雰囲気と絡めて話す。','天気, 季節, 気分, 散歩, 空, 雨');
+  addTheme('recommend','最近のおすすめ','最近気になっていること。本・映画・音楽など軽い雑談。','おすすめ, 本, 映画, 音楽, 最近, 気になる');
+  addTheme('food','おいしいものの話','最近食べたおいしいものや季節の食材について話す。','食べ物, おいしい, 料理, スイーツ, 季節');
+  addTheme('relax','のんびり過ごす','休日の過ごし方や、のんびりする方法について話す。カフェでのひとときも絡める。','のんびり, 休日, リラックス, ゆっくり, 休憩');
+
   clearLayerPreview();
   rCfg(); rPersona(); rThemes();
 }

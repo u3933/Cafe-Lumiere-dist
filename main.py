@@ -3,11 +3,32 @@ Cafe Lumiere - エントリーポイント (vA1 配布版)
 """
 import asyncio
 import logging
+import os
 import shutil
 import signal
 import ssl
 import sys
 from pathlib import Path
+
+# ----------------------------------------------------------------
+# PyInstaller 対応: ベースディレクトリの解決
+#
+# 通常実行時 : BASE_DIR = main.py と同じディレクトリ
+# PyInstaller: BASE_DIR = EXE と同じディレクトリ（_internal/ の親）
+#
+# config.yaml / persona.yaml / assets/ 等の外出しファイルは
+# BASE_DIR 基準で参照する。
+# ----------------------------------------------------------------
+if getattr(sys, 'frozen', False):
+    # PyInstaller でビルドされた EXE として実行中
+    BASE_DIR = Path(sys.executable).parent
+else:
+    # 通常の python main.py 実行
+    BASE_DIR = Path(__file__).parent
+
+# カレントディレクトリを BASE_DIR に固定
+# （相対パスで開くファイルが BASE_DIR 基準になる）
+os.chdir(BASE_DIR)
 
 import yaml
 import aiohttp as _aiohttp
@@ -23,11 +44,27 @@ logger = logging.getLogger("main")
 
 def load_config(path: str = "config.yaml") -> dict:
     config_path  = Path(path)
-    example_path = Path("config.yaml.example")
+
+    # config.yaml.example の検索順:
+    #   1. BASE_DIR（EXEと同じ場所 / 通常実行時はmain.pyと同じ場所）
+    #   2. sys._MEIPASS（PyInstallerが展開した_internal/フォルダ）
+    example_candidates = [BASE_DIR / "config.yaml.example"]
+    if hasattr(sys, '_MEIPASS'):
+        example_candidates.append(Path(sys._MEIPASS) / "config.yaml.example")
+    example_path = next((p for p in example_candidates if p.exists()), None)
+
+    # PyInstaller _internal/ から外出しファイルを BASE_DIR にコピー
+    # （初回起動時のみ実行される）
+    if hasattr(sys, '_MEIPASS'):
+        for fname in ['tts_dict.yaml']:
+            src = Path(sys._MEIPASS) / fname
+            dst = BASE_DIR / fname
+            if src.exists() and not dst.exists():
+                shutil.copy(src, dst)
 
     # config.yaml がなければ example から自動コピーして起動
     if not config_path.exists():
-        if example_path.exists():
+        if example_path:
             shutil.copy(example_path, config_path)
             logger.warning("⚠️  config.yaml が見つからないため config.yaml.example からコピーしました。")
             logger.warning("⚠️  http://localhost:8766/setup_wizard/ で設定を完了してください。")
@@ -219,14 +256,24 @@ async def start_http_server(config: dict, shutdown_event: asyncio.Event, ssl_con
 
     # ----------------------------------------------------------
     # 静的ファイル
+    # パス解決順: BASE_DIR → sys._MEIPASS (_internal/)
+    # 外出しファイル（assets/）は BASE_DIR のみ、
+    # 同梱ファイル（frontend/ setup_wizard/）は両方を探索
     # ----------------------------------------------------------
-    assets_path = Path("assets").resolve()
-    if assets_path.exists():
+    def find_dir(name: str) -> Path | None:
+        """BASE_DIR を2内でディレクトリを探索する"""
+        candidates = [BASE_DIR / name]
+        if hasattr(sys, '_MEIPASS'):
+            candidates.append(Path(sys._MEIPASS) / name)
+        return next((p for p in candidates if p.exists()), None)
+
+    assets_path = find_dir("assets")
+    if assets_path:
         app.router.add_static("/assets", assets_path)
 
     # setup_wizard（ユーザーが任意でアクセス）
-    wizard_path = Path("setup_wizard").resolve()
-    if wizard_path.exists():
+    wizard_path = find_dir("setup_wizard")
+    if wizard_path:
         async def handle_wizard(request):
             return web.FileResponse(wizard_path / "index.html")
         app.router.add_get("/setup_wizard",  handle_wizard)
@@ -234,7 +281,10 @@ async def start_http_server(config: dict, shutdown_event: asyncio.Event, ssl_con
         app.router.add_static("/setup_wizard", wizard_path)
         logger.info("🧙 セットアップウィザード: /setup_wizard/")
 
-    frontend_path = Path("frontend").resolve()
+    frontend_path = find_dir("frontend")
+    if not frontend_path:
+        logger.error("❌ frontend/ ディレクトリが見つかりません")
+        return
 
     async def handle_index(request):
         return web.FileResponse(frontend_path / "index.html")
