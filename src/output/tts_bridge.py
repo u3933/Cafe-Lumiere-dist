@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 def _clean_for_tts(text: str) -> str:
+    # 三点リーダー・省略記号類を読点に変換してポーズを保持
+    text = re.sub(r'…+|\.{2,}', '、', text)
     cleaned = re.sub(
         r'[^\w\s。、！？!?\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBFa-zA-Z0-9ー〜～・]',
         '', text

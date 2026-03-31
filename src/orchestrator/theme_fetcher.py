@@ -24,10 +24,11 @@ _PROMPT_TEMPLATE = """\
 
 カフェの雰囲気に合う、明るく話しやすい話題を選んでください。
 政治・宗教・暴力などデリケートな話題は避けてください。
+今日から1ヶ月以上前に終了したイベント・大会・キャンペーンは除いてください。
 
 【promptフィールドの書き方】
 会話を生成するAIへの情報メモとして書いてください。
-- 今現在の具体的な事実・数字・固有名詞を含める
+- 今現在の具体的な事実・数字・固有名詞を含める（例: 今年の大会名・結果・注目選手など）
 - 一般的な背景知識ではなく「今この時期ならではの情報」を優先する
 - 3〜4文程度、カフェの軽い雑談に使えるレベルの内容で
 
@@ -126,10 +127,11 @@ class ThemeFetcher:
         if start == -1 or end == -1 or end <= start:
             logger.warning(f"⚠️ テーマ JSON が見つかりません: {text[:120]!r}")
             return []
+        m_text = text[start:end + 1]
         try:
-            raw = json.loads(text[start:end + 1])
+            raw = json.loads(m_text)
         except json.JSONDecodeError as e:
-            logger.warning(f"⚠️ テーマ JSON パース失敗: {e}")
+            logger.warning(f"⚠️ テーマ JSON パース失敗: {e} / {text[:120]!r}")
             return []
         themes = []
         for i, item in enumerate(raw):
